@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, line_row %}
+{% block title %}{{ t('purchase.receipt_new') }}{% endblock %}
+{% block content %}
+<h1>{{ t('purchase.receipt_new') }}{% if order %} — {{ order.number }}{% endif %}</h1>
+<p class="small muted">{{ t('purchase.receipt_note') }}</p>
+
+<div id="line-data" data-products='{{ products | tojson }}' hidden></div>
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.supplier_id) }}
+    {{ field(form.document_date) }}
+    {{ field(form.warehouse_id) }}
+    {{ field(form.supplier_reference) }}
+  </div>
+
+  {% if order %}
+  {#- Receiving against an order: the outstanding quantities are received by
+      default, so no editable line table is shown. -#}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th class="num">{{ t('common.quantity') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="num">{{ t('purchase.received') }}</th>
+        <th class="num">{{ t('purchase.receive_remaining') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in order.items %}
+      <tr>
+        <td>{{ item.product.name if item.product else '—' }}</td>
+        <td class="num">{{ item.quantity | qty }}</td>
+        <td>{{ t('unit.' + item.unit.code) if item.unit else '' }}</td>
+        <td class="num">{{ item.received_quantity | qty }}</td>
+        <td class="num">{{ item.remaining_to_receive | qty }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <table class="lines">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="qty">{{ t('common.quantity') }}</th>
+        <th class="price">{{ t('purchase.item_cost') }}</th>
+        <th class="price">{{ t('common.discount') }}</th>
+        <th>{{ t('common.description') }}</th>
+        <th class="num">{{ t('product.available') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ line_row() }}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    <button type="button" class="btn secondary" id="add-line">{{ t('action.add_line') }}</button>
+    <span class="spacer"></span>
+    <span class="small muted">{{ t('common.total') }}: <strong id="preview-subtotal">0.00</strong></span>
+  </div>
+  {% endif %}
+
+  <h2>{{ t('purchase.landed_cost') }}</h2>
+  <p class="small muted">{{ t('purchase.landed_cost_note') }}</p>
+  <div class="form-grid">
+    {{ field(costs.transport_cost) }}
+    {{ field(costs.handling_cost) }}
+    {{ field(costs.other_cost) }}
+  </div>
+
+  {{ field(form.notes) }}
+
+  <div class="form-actions">
+    <button class="btn secondary" type="submit" name="post_now" value="1">{{ t('action.save') }} + {{ t('stock.posted') }}</button>
+    <button class="btn" type="submit">{{ t('action.save') }}</button>
+    <a class="btn ghost" href="{{ url_for('purchasing.receipts') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

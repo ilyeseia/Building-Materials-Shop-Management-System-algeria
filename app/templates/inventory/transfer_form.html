@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "macros.html" import field %}
+{% block title %}{{ t('stock.transfer_new') }}{% endblock %}
+{% block content %}
+<h1>{{ t('stock.transfer_new') }}</h1>
+
+<div id="line-data" data-products='{{ products | tojson }}' hidden></div>
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.transfer_date) }}
+    {{ field(form.source_warehouse_id) }}
+    {{ field(form.destination_warehouse_id) }}
+  </div>
+  {{ field(form.note) }}
+
+  <table class="lines">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th class="qty">{{ t('common.quantity') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="line-row">
+        <td>
+          <select name="line_product_id" data-line="product" aria-label="{{ t('product.title') }}">
+            <option value="">—</option>
+          </select>
+        </td>
+        <td class="qty">
+          <input type="text" inputmode="decimal" name="line_quantity" data-line="quantity"
+                 data-default="" aria-label="{{ t('common.quantity') }}">
+        </td>
+        <td><button type="button" class="btn small secondary remove-line">×</button></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="form-actions">
+    <button type="button" class="btn secondary" id="add-line">{{ t('action.add_line') }}</button>
+    <button class="btn" type="submit">{{ t('action.save') }}</button>
+    <button class="btn secondary" type="submit" name="post_now" value="1">{{ t('action.save') }} + {{ t('stock.posted') }}</button>
+    <a class="btn ghost" href="{{ url_for('inventory.transfers') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "macros.html" import field %}
+{% block title %}{{ t('weigh.new_ticket') }}{% endblock %}
+{% block content %}
+<h1>{{ t('weigh.new_ticket') }}</h1>
+<p class="small muted">{{ t('weigh.manual_entry') }}</p>
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.direction) }}
+    {{ field(form.ticket_date) }}
+    {{ field(form.plate) }}
+    {{ field(form.driver_name) }}
+  </div>
+  <div class="form-grid">
+    {{ field(form.product_id) }}
+    {{ field(form.warehouse_id) }}
+    {{ field(form.customer_id) }}
+    {{ field(form.supplier_id) }}
+    {{ field(form.device_id) }}
+  </div>
+  <div class="form-grid">
+    {{ field(form.gross_weight) }}
+    {{ field(form.tare_weight) }}
+    {{ field(form.expected_quantity) }}
+  </div>
+  {{ field(form.notes) }}
+  <p class="small muted">{{ t('weigh.tare_required') }}</p>
+
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('action.save') }}</button>
+    <a class="btn ghost" href="{{ url_for('weighbridge.tickets') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

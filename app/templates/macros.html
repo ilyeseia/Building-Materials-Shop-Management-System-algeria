@@ -1,0 +1,166 @@
+{#- Reusable form, table and detail macros.
+
+    WTForms labels and choice labels are translation *keys* (for example
+    ``product.stock_unit``); ``BaseForm`` translates them when the form is
+    instantiated, and ``translate_error`` maps the validator messages produced
+    by WTForms onto catalogue keys, so no English default text can reach the
+    screen. -#}
+
+{% macro field(f) %}
+  <div class="field">
+    {{ f.label }}
+    {{ f(**kwargs) }}
+    {% if f.errors %}
+      <ul class="error-list">{% for error in f.errors %}<li>{{ translate_error(error) }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro checkbox(f) %}
+  <div class="field checkbox-row">
+    {{ f(**kwargs) }}
+    {{ f.label }}
+    {% if f.errors %}<ul class="error-list">{% for error in f.errors %}<li>{{ translate_error(error) }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro render_form(form, action=None, cancel_url=None, submit_label=None, enctype=None) %}
+  <form method="post" class="card" {% if action %}action="{{ action }}"{% endif %}
+        {% if enctype %}enctype="{{ enctype }}"{% endif %}>
+    {{ form.hidden_tag() }}
+    <div class="form-grid">
+      {% for f in form if f.type not in ('HiddenField', 'CSRFTokenField', 'SubmitField') %}
+        {% if f.type == 'BooleanField' %}
+          {{ checkbox(f) }}
+        {% else %}
+          {{ field(f) }}
+        {% endif %}
+      {% endfor %}
+    </div>
+    <div class="form-actions">
+      {{ form.submit(class_='btn') if form.submit is defined else '' }}
+      {% if submit_label %}<button class="btn" type="submit">{{ submit_label }}</button>{% endif %}
+      {% if cancel_url %}<a class="btn secondary" href="{{ cancel_url }}">{{ t('action.cancel') }}</a>{% endif %}
+    </div>
+  </form>
+{% endmacro %}
+
+{#- Status and settlement badges share their value vocabulary with the
+    ``status.*`` / ``settlement.*`` catalogue sections. -#}
+{% macro status_badge(value) %}
+  <span class="badge {{ value }}">{{ t('status.' + value) }}</span>
+{% endmacro %}
+
+{% macro settlement_badge(value) %}
+  <span class="badge {{ value }}">{{ t('settlement.' + value) }}</span>
+{% endmacro %}
+
+{% macro pagination(result, base_url, extra=None) %}
+  {% if result.pages > 1 %}
+  <nav class="pagination">
+    {% set filters = extra if extra else {} %}
+    {% if result.has_prev %}
+      <a class="btn small secondary" href="{{ base_url }}?{{ dict(filters, page=result.page - 1) | urlencode }}">{{ t('common.previous') }}</a>
+    {% endif %}
+    <span class="small muted">{{ t('common.page') }} {{ result.page }} / {{ result.pages }}
+      ({{ t('common.records') }}: {{ result.total }})</span>
+    {% if result.has_next %}
+      <a class="btn small secondary" href="{{ base_url }}?{{ dict(filters, page=result.page + 1) | urlencode }}">{{ t('common.next') }}</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+{% endmacro %}
+
+{#- Two-column definition row for detail screens. -#}
+{% macro kv(label_key, value, cls='') %}
+  <tr><th>{{ t(label_key) }}</th><td class="{{ cls }}">{{ value }}</td></tr>
+{% endmacro %}
+
+{#- Read-only document line table.  ``items`` are document items exposing
+    ``product``, ``unit``, ``quantity``, ``unit_price``, ``discount_percent``,
+    ``unit_cost`` and ``line_total``. -#}
+{% macro document_lines(items, show_cost=False) %}
+<table class="data">
+  <thead>
+    <tr>
+      <th>{{ t('common.description') }}</th>
+      <th class="num">{{ t('common.quantity') }}</th>
+      <th>{{ t('common.unit') }}</th>
+      <th class="num">{{ t('common.unit_price') }}</th>
+      <th class="num">{{ t('common.discount') }}</th>
+      {% if show_cost %}<th class="num">{{ t('product.cost_price') }}</th>{% endif %}
+      <th class="num">{{ t('common.total') }}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td>{{ item.description or (item.product.name if item.product else '') }}</td>
+      <td class="num">{{ item.quantity | qty }}</td>
+      <td>{{ t('unit.' + item.unit.code) if item.unit else '' }}</td>
+      <td class="num">{{ item.unit_price | money }}</td>
+      <td class="num">{{ item.discount_percent | percent }}</td>
+      {% if show_cost %}<td class="num">{{ item.unit_cost | money }}</td>{% endif %}
+      <td class="num">{{ item.line_total | money }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{#- Subtotal / discount / tax / total block shared by document detail screens. -#}
+{% macro totals_block(document, net_key='common.subtotal', tax_key='common.tax') %}
+<table class="data">
+  <tbody>
+    <tr><th>{{ t(net_key) }}</th><td class="num">{{ document.subtotal | money }}</td></tr>
+    <tr><th>{{ t('common.discount') }}</th><td class="num">{{ document.discount_amount | money }}</td></tr>
+    <tr><th>{{ t(tax_key) }}</th><td class="num">{{ document.tax_amount | money }}</td></tr>
+    <tr><th>{{ t('common.total') }}</th><td class="num"><strong>{{ document.total_amount | money }}</strong></td></tr>
+  </tbody>
+</table>
+{% endmacro %}
+
+{#- Repeating line-entry row used by the sales, purchasing and inventory forms.
+    Field names match ``app.blueprints.helpers.form_lines`` (``line_*``) and the
+    hooks read by ``app/static/js/app.js``. -#}
+{% macro line_row(show_price=True, show_discount=True, show_cost=False, quantity_label='common.quantity') %}
+<tr class="line-row">
+  <td>
+    <select name="line_product_id" data-line="product" aria-label="{{ t('product.title') }}">
+      <option value="">—</option>
+    </select>
+  </td>
+  <td>
+    <select name="line_unit_id" data-line="unit" aria-label="{{ t('common.unit') }}"></select>
+  </td>
+  <td class="qty">
+    <input type="text" inputmode="decimal" name="line_quantity" data-line="quantity"
+           data-default="" aria-label="{{ t(quantity_label) }}">
+  </td>
+  {% if show_price %}
+  <td class="price">
+    <input type="text" inputmode="decimal" name="line_unit_price" data-line="unit_price"
+           data-default="" aria-label="{{ t('common.unit_price') }}">
+  </td>
+  {% endif %}
+  {% if show_discount %}
+  <td class="price">
+    <input type="text" inputmode="decimal" name="line_discount_percent" data-line="discount"
+           data-default="0" aria-label="{{ t('common.discount') }}">
+  </td>
+  {% endif %}
+  {% if show_cost %}
+  <td class="price">
+    <input type="text" inputmode="decimal" name="line_unit_cost" data-line="cost"
+           data-default="" aria-label="{{ t('product.cost_price') }}">
+  </td>
+  {% endif %}
+  <td>
+    <input type="text" name="line_description" data-default=""
+           aria-label="{{ t('common.description') }}">
+  </td>
+  <td class="num small" data-line="available"></td>
+  <td class="num" data-line="total">0.00</td>
+  <td><button type="button" class="btn small secondary remove-line">×</button></td>
+</tr>
+{% endmacro %}

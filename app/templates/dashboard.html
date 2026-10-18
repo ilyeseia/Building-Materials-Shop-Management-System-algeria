@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ t('dashboard.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('dashboard.title') }}</h1>
+
+<div class="grid cols-3">
+  <div class="kpi">
+    <div class="label">{{ t('dashboard.sales_month') }}</div>
+    <div class="value">{{ kpis.sales_month_total | money }}</div>
+    <div class="small muted">{{ kpis.sales_month_count }} {{ t('sale.invoices') }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('report.gross_margin') }}</div>
+    <div class="value">{{ kpis.gross_margin_month | money }}</div>
+    <div class="small muted">
+      {% if kpis.gross_margin_percent is not none %}{{ kpis.gross_margin_percent | percent }}{% else %}—{% endif %}
+    </div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('dashboard.stock_value') }}</div>
+    <div class="value">{{ kpis.stock_value | money }}</div>
+    <div class="small muted">{{ kpis.stock_level_count }} {{ t('stock.levels') }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('dashboard.receivables') }}</div>
+    <div class="value">{{ kpis.receivable_total | money }}</div>
+    <div class="small muted"><a href="{{ url_for('reports.receivables') }}">{{ t('report.receivables_aging') }}</a></div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('dashboard.payables') }}</div>
+    <div class="value">{{ kpis.payable_total | money }}</div>
+    <div class="small muted"><a href="{{ url_for('reports.payables') }}">{{ t('report.payables_aging') }}</a></div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('common.this_year') }}</div>
+    <div class="value">{{ kpis.sales_year_total | money }}</div>
+    <div class="small muted">{{ kpis.sales_year_count }} {{ t('sale.invoices') }}</div>
+  </div>
+</div>
+
+{% if can('sales.manage') or can('purchasing.manage') or can('weigh.manage') %}
+<div class="card">
+  <h2>{{ t('dashboard.quick_actions') }}</h2>
+  <div class="form-actions">
+    {% if can('sales.manage') %}<a class="btn" href="{{ url_for('sales.direct_sale') }}">{{ t('dashboard.new_sale') }}</a>{% endif %}
+    {% if can('purchasing.manage') %}<a class="btn secondary" href="{{ url_for('purchasing.order_new') }}">{{ t('dashboard.new_purchase') }}</a>{% endif %}
+    {% if can('weigh.manage') %}<a class="btn secondary" href="{{ url_for('weighbridge.ticket_new') }}">{{ t('dashboard.new_weighing') }}</a>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('report.sales') }}</h2>
+    <p class="small muted">{{ t('report.period') }}: {{ period[0] | d }} — {{ period[1] | d }}</p>
+    {% if sales_series %}
+    <table class="data">
+      <thead><tr><th>{{ t('common.date') }}</th><th class="num">{{ t('sale.invoices') }}</th><th class="num">{{ t('common.total') }}</th></tr></thead>
+      <tbody>
+        {% for point in sales_series %}
+        <tr>
+          <td>{{ point.day | d }}</td>
+          <td class="num">{{ point.count }}</td>
+          <td class="num">{{ point.total | money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('dashboard.no_orders_today') }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>{{ t('dashboard.top_products') }}</h2>
+    {% if top_products %}
+    <table class="data">
+      <thead><tr><th>{{ t('product.title') }}</th><th class="num">{{ t('common.quantity') }}</th><th class="num">{{ t('common.total') }}</th></tr></thead>
+      <tbody>
+        {% for product in top_products %}
+        <tr>
+          <td>{{ product.name }}</td>
+          <td class="num">{{ product.quantity | qty }}</td>
+          <td class="num">{{ product.revenue | money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('dashboard.low_stock') }}</h2>
+    {% if kpis.low_stock %}
+    <table class="data">
+      <thead><tr><th>{{ t('product.title') }}</th><th class="num">{{ t('product.available') }}</th><th class="num">{{ t('product.reorder_level') }}</th></tr></thead>
+      <tbody>
+        {% for product in kpis.low_stock %}
+        <tr>
+          <td><a href="{{ url_for('catalog.product_detail', product_id=product.product_id) }}">{{ product.name }}</a></td>
+          <td class="num">{{ product.available | qty }}</td>
+          <td class="num">{{ product.reorder_level | qty }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>{{ t('nav.operations') }}</h2>
+    <table class="data">
+      <tbody>
+        <tr>
+          <th>{{ t('weigh.tickets') }}</th>
+          <td class="num">{{ kpis.weighing_today }}</td>
+          <td class="small muted"><a href="{{ url_for('weighbridge.tickets') }}">{{ t('action.details') }}</a></td>
+        </tr>
+        <tr>
+          <th>{{ t('fleet.trips') }}</th>
+          <td class="num">{{ kpis.trips_open }}</td>
+          <td class="small muted"><a href="{{ url_for('fleet.trips') }}">{{ t('action.details') }}</a></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small muted">{{ t('dashboard.kpi_note') }}</p>
+  </div>
+</div>
+{% endblock %}

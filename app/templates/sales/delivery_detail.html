@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge, settlement_badge, document_lines, totals_block %}
+{% block title %}{{ delivery.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('sale.delivery') }} — {{ delivery.number }} {{ status_badge(delivery.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('sale.customer', delivery.customer.name if delivery.customer else '—') }}
+      {{ kv('common.date', delivery.delivery_date | d) }}
+      {{ kv('stock.warehouse', localized_name(delivery.warehouse) if delivery.warehouse else '—') }}
+      {% if delivery.order %}{{ kv('sale.order', delivery.order.number) }}{% endif %}
+      {{ kv('fleet.transport_fee', delivery.transport_fee | money, 'num') }}
+      {{ kv('print.received_by', delivery.received_by_name or '—') }}
+      {{ kv('sale.delivery_address', delivery.delivery_address or '—') }}
+      {{ kv('common.notes', delivery.notes or '—') }}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    {% if can('sales.manage') and delivery.status == 'delivered' and not invoices %}
+    <form method="post" action="{{ url_for('sales.delivery_invoice', delivery_id=delivery.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">{{ t('sale.create_invoice') }}</button>
+    </form>
+    {% endif %}
+    {% if delivery.trip %}
+      <a class="btn secondary" href="{{ url_for('fleet.trip_detail', trip_id=delivery.trip.id) }}">{{ t('fleet.trip') }} {{ delivery.trip.number }}</a>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('sales.deliveries') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('sale.lines') }}</h2>
+  {{ document_lines(delivery.items) }}
+  {{ totals_block(delivery) }}
+</div>
+
+<div class="card">
+  <h2>{{ t('sale.invoices') }}</h2>
+  {% if invoices %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.number') }}</th>
+        <th>{{ t('common.date') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th>{{ t('payment.status') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for invoice in invoices %}
+      <tr>
+        <td><a href="{{ url_for('sales.invoice_detail', invoice_id=invoice.id) }}">{{ invoice.number }}</a></td>
+        <td>{{ invoice.invoice_date | d }}</td>
+        <td class="num">{{ invoice.total_amount | money }}</td>
+        <td>{{ settlement_badge(invoice.settlement_status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

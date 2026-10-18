@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, line_row %}
+{% block title %}{{ t('sale.quotation_new') }}{% endblock %}
+{% block content %}
+<h1>{{ t('sale.quotation_new') }}</h1>
+
+{#- The products payload feeds the line-entry JavaScript (units, prices,
+    available stock).  It is a preview only: the server recomputes every total
+    in Decimal. -#}
+<div id="line-data" data-products='{{ products | tojson }}' hidden></div>
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.customer_id) }}
+    {{ field(form.document_date) }}
+    {{ field(form.valid_until) }}
+    {{ field(form.warehouse_id) }}
+    {{ field(form.price_list, id='price-list') }}
+  </div>
+  {{ field(form.notes) }}
+
+  <table class="lines">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="qty">{{ t('common.quantity') }}</th>
+        <th class="price">{{ t('common.unit_price') }}</th>
+        <th class="price">{{ t('common.discount') }}</th>
+        <th>{{ t('common.description') }}</th>
+        <th class="num">{{ t('product.available') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ line_row() }}
+    </tbody>
+  </table>
+
+  <div class="form-actions">
+    <button type="button" class="btn secondary" id="add-line">{{ t('action.add_line') }}</button>
+    <span class="spacer"></span>
+    <span class="small muted">{{ t('common.total') }}: <strong id="preview-subtotal">0.00</strong></span>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('action.save') }}</button>
+    <a class="btn ghost" href="{{ url_for('sales.quotations') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

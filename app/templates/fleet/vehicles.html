@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('fleet.vehicles') }}{% endblock %}
+{% block content %}
+<h1>{{ t('fleet.vehicles') }}</h1>
+
+{% if can('fleet.manage') %}
+{{ render_form(form, cancel_url=url_for('fleet.vehicles')) }}
+{% endif %}
+
+<div class="card">
+  {% if items %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('fleet.plate') }}</th>
+        <th>{{ t('common.name') }}</th>
+        <th>{{ t('fleet.vehicle_type') }}</th>
+        <th>{{ t('fleet.ownership') }}</th>
+        <th class="num">{{ t('fleet.capacity') }}</th>
+        <th class="num">{{ t('fleet.tare_weight') }}</th>
+        <th>{{ t('fleet.insurance_expiry') }}</th>
+        <th>{{ t('fleet.inspection_expiry') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for vehicle in items %}
+      <tr>
+        <td class="mono">{{ vehicle.plate }}</td>
+        <td>{{ vehicle.label or '—' }}</td>
+        <td>{{ vehicle.vehicle_type or '—' }}</td>
+        <td>{{ t('status.' + vehicle.ownership) }}</td>
+        <td class="num">
+          {% if vehicle.capacity_quantity is not none %}
+            {{ vehicle.capacity_quantity | qty }}{% if vehicle.capacity_unit %} {{ t('unit.' + vehicle.capacity_unit.code) }}{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td class="num">{{ vehicle.tare_weight_kg | qty_unit('kg') if vehicle.tare_weight_kg is not none else '—' }}</td>
+        <td>
+          {{ vehicle.insurance_expiry | d or '—' }}
+          {% if 'insurance_expiry' in vehicle.documents_expiring %}<span class="badge overdue">{{ t('status.overdue') }}</span>{% endif %}
+        </td>
+        <td>
+          {{ vehicle.inspection_expiry | d or '—' }}
+          {% if 'inspection_expiry' in vehicle.documents_expiring %}<span class="badge overdue">{{ t('status.overdue') }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

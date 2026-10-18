@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "macros.html" import line_row %}
+{% block title %}{{ t('sale.credit_note') }}{% endblock %}
+{% block content %}
+<h1>{{ t('sale.credit_note') }} — {{ invoice.number }}</h1>
+<p class="small muted">{{ t('sale.credit_note_note') }}</p>
+
+<div id="line-data" data-products='{{ products | tojson }}' hidden></div>
+
+<form method="post" class="card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="field">
+    <label for="reason">{{ t('common.reason') }}</label>
+    <input type="text" id="reason" name="reason" maxlength="255" required>
+  </div>
+
+  <table class="lines">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="qty">{{ t('common.quantity') }}</th>
+        <th class="price">{{ t('common.unit_price') }}</th>
+        <th class="price">{{ t('common.discount') }}</th>
+        <th>{{ t('common.description') }}</th>
+        <th class="num">{{ t('product.available') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ line_row() }}
+    </tbody>
+  </table>
+
+  <div class="form-actions">
+    <button type="button" class="btn secondary" id="add-line">{{ t('action.add_line') }}</button>
+    <span class="spacer"></span>
+    <span class="small muted">{{ t('common.total') }}: <strong id="preview-subtotal">0.00</strong></span>
+  </div>
+
+  <div class="field checkbox-row">
+    <input type="checkbox" id="restock" name="restock" value="1" checked>
+    <label for="restock">{{ t('sale.restock') }}</label>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('action.save') }}</button>
+    <a class="btn ghost" href="{{ url_for('sales.invoice_detail', invoice_id=invoice.id) }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

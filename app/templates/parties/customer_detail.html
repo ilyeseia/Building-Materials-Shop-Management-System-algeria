@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge, settlement_badge %}
+{% block title %}{{ customer.name }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ customer.name }}
+    <span class="badge">{{ t('customer.type.' + customer.customer_type) }}</span>
+    {% if customer.is_blocked %}<span class="badge blocked">{{ t('customer.blocked') }}</span>{% endif %}
+    {% if not customer.is_active %}<span class="badge inactive">{{ t('status.inactive') }}</span>{% endif %}
+  </h1>
+  <div class="form-actions">
+    {% if can('customers.manage') %}
+      <a class="btn" href="{{ url_for('parties.customer_edit', customer_id=customer.id) }}">{{ t('action.edit') }}</a>
+    {% endif %}
+    {% if can('payments.manage') %}
+      <a class="btn secondary" href="{{ url_for('finance.payment_new', direction='inbound') }}">{{ t('payment.record_payment') }}</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('common.address') }}</h2>
+    <table class="data">
+      <tbody>
+        {{ kv('customer.code', customer.code or '—', 'mono') }}
+        {{ kv('customer.contact_person', customer.contact_person or '—') }}
+        {{ kv('common.phone', customer.phone or '—') }}
+        {{ kv('party.phone_secondary', customer.phone_secondary or '—') }}
+        {{ kv('common.email', customer.email or '—') }}
+        {{ kv('address.street', customer.street or '—') }}
+        {{ kv('address.locality', customer.locality or '—') }}
+        {{ kv('address.commune', customer.commune or '—') }}
+        {{ kv('address.wilaya', wilaya_name(customer.wilaya_code) or '—') }}
+        {{ kv('customer.tax_id', customer.tax_id or '—') }}
+        {{ kv('customer.registry', customer.registry_no or '—') }}
+        {{ kv('customer.payment_terms', customer.payment_terms_days) }}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>{{ t('customer.balance') }}</h2>
+    <table class="data">
+      <tbody>
+        {{ kv('customer.balance', balance | money, 'num') }}
+        {{ kv('payment.advance', credit | money, 'num') }}
+        {{ kv('customer.credit_limit', customer.credit_limit | money, 'num') }}
+        {{ kv('customer.opening_balance', customer.opening_balance | money, 'num') }}
+      </tbody>
+    </table>
+    {% if customer.notes %}<p class="small">{{ customer.notes }}</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('sale.invoices') }}</h2>
+  {% if invoices %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.number') }}</th>
+        <th>{{ t('common.date') }}</th>
+        <th>{{ t('print.due_date') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th class="num">{{ t('sale.balance_due') }}</th>
+        <th>{{ t('common.status') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for invoice in invoices %}
+      <tr>
+        <td><a href="{{ url_for('sales.invoice_detail', invoice_id=invoice.id) }}">{{ invoice.number }}</a></td>
+        <td>{{ invoice.invoice_date | d }}</td>
+        <td>{{ invoice.due_date | d }}</td>
+        <td class="num">{{ invoice.total_amount | money }}</td>
+        <td class="num">{{ invoice.balance_due | money }}</td>
+        <td>{{ settlement_badge(invoice.settlement_status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>{{ t('payment.receipt') }}</h2>
+  {% if receipts %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.number') }}</th>
+        <th>{{ t('common.date') }}</th>
+        <th>{{ t('payment.method') }}</th>
+        <th class="num">{{ t('payment.amount') }}</th>
+        <th>{{ t('common.status') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for receipt in receipts %}
+      <tr>
+        <td><a href="{{ url_for('finance.payment_detail', payment_id=receipt.id) }}">{{ receipt.number }}</a></td>
+        <td>{{ receipt.payment_date | d }}</td>
+        <td>{{ t('payment.method.' + receipt.method) }}</td>
+        <td class="num">{{ receipt.amount | money }}</td>
+        <td>{{ status_badge(receipt.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

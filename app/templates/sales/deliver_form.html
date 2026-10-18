@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ t('sale.create_delivery') }}{% endblock %}
+{% block content %}
+<h1>{{ t('sale.create_delivery') }} — {{ order.number }}</h1>
+<p class="small muted">{{ t('sale.deliver_note') }}</p>
+
+{#- This screen is a raw POST form: the per-line quantities are named
+    ``deliver_<order item id>`` and read directly by the blueprint. -#}
+<form method="post" class="card">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="num">{{ t('common.quantity') }}</th>
+        <th class="num">{{ t('sale.delivered_total') }}</th>
+        <th class="num">{{ t('sale.deliver_remaining') }}</th>
+        <th class="qty">{{ t('sale.deliver_remaining') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in order.items %}
+      <tr>
+        <td>{{ item.product.name if item.product else '—' }}</td>
+        <td>{{ t('unit.' + item.unit.code) if item.unit else '' }}</td>
+        <td class="num">{{ item.quantity | qty }}</td>
+        <td class="num">{{ item.delivered_quantity | qty }}</td>
+        <td class="num">{{ item.remaining_to_deliver | qty }}</td>
+        <td class="qty">
+          <input type="text" inputmode="decimal" name="deliver_{{ item.id }}"
+                 value="{{ item.remaining_to_deliver }}"
+                 aria-label="{{ t('sale.deliver_remaining') }}">
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="form-grid">
+    <div class="field">
+      <label for="delivery_date">{{ t('sale.delivery_date') }}</label>
+      <input type="date" id="delivery_date" name="delivery_date" value="{{ today.isoformat() }}">
+    </div>
+    <div class="field">
+      <label for="transport_fee">{{ t('fleet.transport_fee') }}</label>
+      <input type="text" inputmode="decimal" id="transport_fee" name="transport_fee" data-default="0" value="0">
+    </div>
+    <div class="field">
+      <label for="received_by_name">{{ t('print.received_by') }}</label>
+      <input type="text" id="received_by_name" name="received_by_name" maxlength="120">
+    </div>
+  </div>
+  <div class="field">
+    <label for="notes">{{ t('common.notes') }}</label>
+    <textarea id="notes" name="notes" rows="2"></textarea>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('action.deliver') }}</button>
+    <a class="btn ghost" href="{{ url_for('sales.order_detail', order_id=order.id) }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

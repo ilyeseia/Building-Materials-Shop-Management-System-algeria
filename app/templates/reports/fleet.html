@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ t('report.transport_costs') }}{% endblock %}
+{% block content %}
+<h1>{{ t('report.transport_costs') }}</h1>
+
+<form method="get" action="{{ url_for('reports.fleet_report') }}" class="card no-print">
+  <div class="form-grid">
+    <div class="field">
+      <label for="from">{{ t('report.start_date') }}</label>
+      <input type="date" id="from" name="from" value="{{ period[0].isoformat() }}">
+    </div>
+    <div class="field">
+      <label for="to">{{ t('report.end_date') }}</label>
+      <input type="date" id="to" name="to" value="{{ period[1].isoformat() }}">
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('report.generate') }}</button>
+  </div>
+</form>
+
+<div class="grid cols-3">
+  <div class="kpi">
+    <div class="label">{{ t('fleet.trips') }}</div>
+    <div class="value">{{ summary.trips }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('fleet.transport_fee') }}</div>
+    <div class="value">{{ summary.transport_revenue | money }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('fleet.margin') }}</div>
+    <div class="value">{{ summary.margin | money }}</div>
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('fleet.profitability') }}</h2>
+    <table class="data">
+      <tbody>
+        <tr><th>{{ t('fleet.transport_fee') }}</th><td class="num">{{ summary.transport_revenue | money }}</td></tr>
+        <tr><th>{{ t('fleet.carrier_cost') }}</th><td class="num">{{ summary.carrier_cost | money }}</td></tr>
+        <tr><th>{{ t('fleet.other_expenses') }}</th><td class="num">{{ summary.expenses | money }}</td></tr>
+        <tr><th>{{ t('fleet.total_cost') }}</th><td class="num">{{ summary.total_cost | money }}</td></tr>
+        <tr><th>{{ t('fleet.margin') }}</th><td class="num"><strong>{{ summary.margin | money }}</strong></td></tr>
+      </tbody>
+    </table>
+    <p class="small muted">{{ t('fleet.margin_note') }}</p>
+  </div>
+
+  <div class="card">
+    <h2>{{ t('sale.deliveries') }}</h2>
+    <table class="data">
+      <tbody>
+        <tr><th>{{ t('sale.deliveries') }}</th><td class="num">{{ deliveries.deliveries }}</td></tr>
+        <tr><th>{{ t('fleet.transport_fee') }}</th><td class="num">{{ deliveries.transport_fees | money }}</td></tr>
+      </tbody>
+    </table>
+    <p class="small muted">{{ t('report.movement_analysis') }}: {{ t('report.period') }} {{ period[0] | d }} — {{ period[1] | d }}</p>
+  </div>
+</div>
+{% endblock %}

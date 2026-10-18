@@ -1,38 +1,77 @@
 @echo off
-echo Starting Building Materials Shop Management System...
+setlocal
+REM --------------------------------------------------------------------------
+REM  Development launcher.
+REM
+REM  This script never creates a default account and never invents a password:
+REM  the audited revision printed "Default login: admin / admin123", which was
+REM  not true and encouraged a guessable administrator account.  Create your
+REM  first user explicitly with the command below.
+REM --------------------------------------------------------------------------
+cd /d "%~dp0"
+
+echo Starting the building-materials management system...
 echo.
 
-REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo Error: Python is not installed or not in PATH
-    echo Please install Python 3.8 or higher
+    echo ERROR: Python is not installed or not on PATH. Install Python 3.11+ first.
     pause
     exit /b 1
 )
 
-REM Check if virtual environment exists
-if not exist "venv" (
-    echo Creating virtual environment...
-    python -m venv venv
+if not exist ".venv" (
+    echo Creating virtual environment .venv ...
+    python -m venv .venv
+    if errorlevel 1 (
+        echo ERROR: could not create the virtual environment.
+        pause
+        exit /b 1
+    )
 )
 
-REM Activate virtual environment
-echo Activating virtual environment...
-call venv\Scripts\activate
+call ".venv\Scripts\activate.bat"
 
-REM Install requirements
-echo Installing requirements...
-pip install -r requirements.txt
+echo Installing / updating dependencies ...
+python -m pip install --upgrade pip >nul
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERROR: dependency installation failed.
+    pause
+    exit /b 1
+)
 
-REM Start the application
-echo Starting application...
+if not exist ".env" (
+    if exist ".env.example" (
+        echo Creating .env from .env.example - review it before production use.
+        copy /y ".env.example" ".env" >nul
+    )
+)
+
+REM Create the schema and reference data.  This is idempotent and never drops tables.
 echo.
-echo The application will be available at: http://localhost:5000
-echo Default login: admin / admin123
+echo Creating the schema and reference data (safe to re-run) ...
+python -m flask --app wsgi init-db
+if errorlevel 1 (
+    echo ERROR: database initialisation failed. Check DATABASE_URL / SECRET_KEY.
+    pause
+    exit /b 1
+)
+
 echo.
-echo Press Ctrl+C to stop the application
+echo --------------------------------------------------------------------------
+echo  If you have not created an administrator yet, run this in another window:
 echo.
+echo      .venv\Scripts\flask --app wsgi create-user --username admin --role admin
+echo.
+echo  You will be prompted for the password; it is never stored in this script.
+echo --------------------------------------------------------------------------
+echo.
+echo The interface will be available at: http://127.0.0.1:5000
+echo Press Ctrl+C to stop.
+echo.
+
 python app.py
 
 pause
+endlocal

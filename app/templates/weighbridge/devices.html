@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('weigh.devices') }}{% endblock %}
+{% block content %}
+<h1>{{ t('weigh.devices') }}</h1>
+<p class="small muted">{{ t('weigh.device_note') }}</p>
+
+{% if can('weigh.manage') %}
+{{ render_form(form, cancel_url=url_for('weighbridge.devices')) }}
+{% endif %}
+
+<div class="card">
+  {% if items %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.code') }}</th>
+        <th>{{ t('common.name') }}</th>
+        <th>{{ t('weigh.protocol') }}</th>
+        <th>{{ t('weigh.serial_number') }}</th>
+        <th class="num">{{ t('weigh.capacity') }}</th>
+        <th class="num">{{ t('weigh.division') }}</th>
+        <th>{{ t('weigh.calibration_reference') }}</th>
+        <th>{{ t('weigh.calibration_valid_until') }}</th>
+        {% if can('weigh.manage') %}<th>{{ t('common.actions') }}</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for device in items %}
+      <tr>
+        <td class="mono">{{ device.code }}</td>
+        <td>{{ device.name }}</td>
+        <td>
+          {{ t('weigh.protocol.' + device.protocol) }}
+          {% if device.protocol not in implemented %}<span class="badge warning">{{ t('status.unavailable') }}</span>{% endif %}
+        </td>
+        <td class="mono">{{ device.serial_number or '—' }}</td>
+        <td class="num">{{ device.capacity_kg | qty_unit('kg') if device.capacity_kg is not none else '—' }}</td>
+        <td class="num">{{ device.division_kg | qty_unit('kg') if device.division_kg is not none else '—' }}</td>
+        <td>{{ device.calibration_reference or '—' }}</td>
+        <td>
+          {{ device.calibration_valid_until | d or '—' }}
+          {% if device.calibration_due %}<span class="badge overdue">{{ t('status.overdue') }}</span>{% endif %}
+        </td>
+        {% if can('weigh.manage') %}
+        <td><a class="btn small" href="{{ url_for('weighbridge.device_edit', device_id=device.id) }}">{{ t('action.edit') }}</a></td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

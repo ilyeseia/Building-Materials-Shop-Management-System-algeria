@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ t('report.sales') }}{% endblock %}
+{% block content %}
+<h1>{{ t('report.sales') }}</h1>
+
+<form method="get" action="{{ url_for('reports.sales_report') }}" class="card no-print">
+  <div class="form-grid">
+    <div class="field">
+      <label for="from">{{ t('report.start_date') }}</label>
+      <input type="date" id="from" name="from" value="{{ period[0].isoformat() }}">
+    </div>
+    <div class="field">
+      <label for="to">{{ t('report.end_date') }}</label>
+      <input type="date" id="to" name="to" value="{{ period[1].isoformat() }}">
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('report.generate') }}</button>
+  </div>
+</form>
+
+<div class="grid cols-3">
+  <div class="kpi">
+    <div class="label">{{ t('dashboard.sales_month') }}</div>
+    <div class="value">{{ (series | sum(attribute='total')) | money }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('payment.receivables') }}</div>
+    <div class="value">{{ payments.received | money }}</div>
+    <div class="small muted">{{ payments.received_count }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('payment.payables') }}</div>
+    <div class="value">{{ payments.paid | money }}</div>
+    <div class="small muted">{{ payments.paid_count }}</div>
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('report.sales') }}</h2>
+    {% if series %}
+    <table class="data">
+      <thead><tr><th>{{ t('common.date') }}</th><th class="num">{{ t('sale.invoices') }}</th><th class="num">{{ t('common.total') }}</th></tr></thead>
+      <tbody>
+        {% for point in series %}
+        <tr>
+          <td>{{ point.day | d }}</td>
+          <td class="num">{{ point.count }}</td>
+          <td class="num">{{ point.total | money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>{{ t('report.customer_sales') }}</h2>
+    {% if by_customer %}
+    <table class="data">
+      <thead><tr><th>{{ t('sale.customer') }}</th><th class="num">{{ t('sale.invoices') }}</th><th class="num">{{ t('common.total') }}</th></tr></thead>
+      <tbody>
+        {% for row in by_customer %}
+        <tr>
+          <td>{{ row.name }}</td>
+          <td class="num">{{ row.count }}</td>
+          <td class="num">{{ row.total | money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('dashboard.top_products') }}</h2>
+  {% if top_products %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th class="num">{{ t('common.quantity') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th class="num">{{ t('report.gross_margin') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in top_products %}
+      <tr>
+        <td><a href="{{ url_for('catalog.product_detail', product_id=row.product_id) }}">{{ row.name }}</a></td>
+        <td class="num">{{ row.quantity | qty }}</td>
+        <td class="num">{{ row.revenue | money }}</td>
+        <td class="num">{{ row.margin | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

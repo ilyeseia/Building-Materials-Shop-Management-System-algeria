@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, settlement_badge %}
+{% block title %}{{ supplier.name }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ supplier.name }}
+    {% if not supplier.is_active %}<span class="badge inactive">{{ t('status.inactive') }}</span>{% endif %}
+  </h1>
+  <div class="form-actions">
+    {% if can('suppliers.manage') %}
+      <a class="btn" href="{{ url_for('parties.supplier_edit', supplier_id=supplier.id) }}">{{ t('action.edit') }}</a>
+    {% endif %}
+    {% if can('payments.manage') %}
+      <a class="btn secondary" href="{{ url_for('finance.payment_new', direction='outbound') }}">{{ t('payment.record_payment') }}</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('common.address') }}</h2>
+    <table class="data">
+      <tbody>
+        {{ kv('supplier.code', supplier.code or '—', 'mono') }}
+        {{ kv('party.contact_person', supplier.contact_person or '—') }}
+        {{ kv('common.phone', supplier.phone or '—') }}
+        {{ kv('party.phone_secondary', supplier.phone_secondary or '—') }}
+        {{ kv('common.email', supplier.email or '—') }}
+        {{ kv('address.street', supplier.street or '—') }}
+        {{ kv('address.locality', supplier.locality or '—') }}
+        {{ kv('address.commune', supplier.commune or '—') }}
+        {{ kv('address.wilaya', wilaya_name(supplier.wilaya_code) or '—') }}
+        {{ kv('party.tax_id', supplier.tax_id or '—') }}
+        {{ kv('party.registry_no', supplier.registry_no or '—') }}
+        {{ kv('party.payment_terms', supplier.payment_terms_days) }}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>{{ t('supplier.balance') }}</h2>
+    <table class="data">
+      <tbody>
+        {{ kv('supplier.balance', balance | money, 'num') }}
+        {{ kv('party.opening_balance', supplier.opening_balance | money, 'num') }}
+        {{ kv('supplier.materials', supplier.supplied_materials or '—') }}
+      </tbody>
+    </table>
+    {% if supplier.notes %}<p class="small">{{ supplier.notes }}</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('purchase.supplier_invoices') }}</h2>
+  {% if invoices %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.number') }}</th>
+        <th>{{ t('common.date') }}</th>
+        <th>{{ t('purchase.supplier_reference') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th class="num">{{ t('sale.balance_due') }}</th>
+        <th>{{ t('common.status') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for invoice in invoices %}
+      <tr>
+        <td><a href="{{ url_for('purchasing.invoice_detail', invoice_id=invoice.id) }}">{{ invoice.number }}</a></td>
+        <td>{{ invoice.invoice_date | d }}</td>
+        <td>{{ invoice.supplier_reference or '—' }}</td>
+        <td class="num">{{ invoice.total_amount | money }}</td>
+        <td class="num">{{ invoice.balance_due | money }}</td>
+        <td>{{ settlement_badge(invoice.settlement_status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('fleet.drivers') }}{% endblock %}
+{% block content %}
+<h1>{{ t('fleet.drivers') }}</h1>
+
+{% if can('fleet.manage') %}
+{{ render_form(form, cancel_url=url_for('fleet.drivers')) }}
+{% endif %}
+
+<div class="card">
+  {% if items %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.name') }}</th>
+        <th>{{ t('common.phone') }}</th>
+        <th>{{ t('fleet.licence_no') }}</th>
+        <th>{{ t('fleet.licence_category') }}</th>
+        <th>{{ t('fleet.licence_expiry') }}</th>
+        <th>{{ t('common.status') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for driver in items %}
+      <tr>
+        <td>{{ driver.name }}</td>
+        <td class="mono">{{ driver.phone or '—' }}</td>
+        <td class="mono">{{ driver.licence_no or '—' }}</td>
+        <td>{{ driver.licence_category or '—' }}</td>
+        <td>{{ driver.licence_expiry | d or '—' }}</td>
+        <td>{{ t('status.active') if driver.is_active else t('status.inactive') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge %}
+{% block title %}{{ payment.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('payment.voucher') }} — {{ payment.number }} {{ status_badge(payment.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('payment.direction', t('payment.' + payment.direction)) }}
+      {{ kv('common.party', (payment.customer.name if payment.customer else payment.supplier.name if payment.supplier else '—')) }}
+      {{ kv('common.date', payment.payment_date | d) }}
+      {{ kv('payment.method', t('payment.method.' + payment.method)) }}
+      {{ kv('common.reference', payment.reference or '—') }}
+      {{ kv('payment.amount', payment.amount | money, 'num') }}
+      {{ kv('payment.allocated', payment.allocated_amount | money, 'num') }}
+      {{ kv('payment.unallocated', payment.unallocated_amount | money, 'num') }}
+      {{ kv('common.notes', payment.notes or '—') }}
+      {% if payment.reversed_at %}
+        {{ kv('audit.reversed', payment.reversed_at | dt) }}
+        {{ kv('common.reason', payment.reversal_reason or '—') }}
+      {% endif %}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    {% if can('payments.manage') and payment.status == 'posted' %}
+    <form method="post" action="{{ url_for('finance.payment_reverse', payment_id=payment.id) }}"
+          data-confirm="{{ t('payment.reverse_confirm') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="reason" value="">
+      <button class="btn secondary" type="submit">{{ t('payment.reversed') }}</button>
+    </form>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('finance.payments') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('payment.allocated') }}</h2>
+  {% if payment.allocations %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.type') }}</th>
+        <th>{{ t('common.number') }}</th>
+        <th class="num">{{ t('payment.amount') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for allocation in payment.allocations %}
+      <tr>
+        <td>{{ t('payment.document.' + allocation.document_type) }}</td>
+        <td class="mono">{{ allocation.document_type }}#{{ allocation.document_id }}</td>
+        <td class="num">{{ allocation.amount | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+
+{% if can('payments.manage') and payment.status == 'posted' and payment.unallocated_amount > 0 %}
+<div class="card">
+  <h2>{{ t('payment.allocate') }}</h2>
+  <p class="small muted">{{ t('payment.remaining_to_allocate') }}: {{ payment.unallocated_amount | money }}</p>
+  <form method="post" action="{{ url_for('finance.payment_allocate', payment_id=payment.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="document_type">{{ t('common.type') }}</label>
+        <select id="document_type" name="document_type">
+          {% if payment.direction == 'inbound' %}
+          <option value="sales_invoice">{{ t('payment.document.sales_invoice') }}</option>
+          {% else %}
+          <option value="supplier_invoice">{{ t('payment.document.supplier_invoice') }}</option>
+          {% endif %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="document_id">{{ t('common.number') }}</label>
+        <input type="number" id="document_id" name="document_id" min="1" required>
+      </div>
+      <div class="field">
+        <label for="amount">{{ t('payment.amount') }}</label>
+        <input type="text" inputmode="decimal" id="amount" name="amount"
+               value="{{ payment.unallocated_amount }}">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">{{ t('payment.allocate') }}</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

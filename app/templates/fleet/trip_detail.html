@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge, field %}
+{% block title %}{{ trip.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('fleet.trip') }} — {{ trip.number }} {{ status_badge(trip.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('common.date', trip.trip_date | d) }}
+      {{ kv('fleet.planned_date', trip.planned_date | d) }}
+      {{ kv('fleet.vehicle', trip.vehicle.plate if trip.vehicle else (trip.carrier.name if trip.carrier else '—')) }}
+      {{ kv('fleet.driver', trip.driver.name if trip.driver else '—') }}
+      {{ kv('fleet.carrier', trip.carrier.name if trip.carrier else '—') }}
+      {% if trip.customer %}{{ kv('sale.customer', trip.customer.name) }}{% endif %}
+      {{ kv('fleet.origin', trip.origin or '—') }}
+      {{ kv('fleet.destination', trip.destination or '—') }}
+      {{ kv('fleet.actual_departure', trip.departed_at | dt) }}
+      {{ kv('fleet.actual_arrival', trip.arrived_at | dt) }}
+      {{ kv('fleet.odometer', trip.distance_km | num(1) if trip.distance_km is not none else '—') }}
+      {% if trip.failure_reason %}{{ kv('fleet.failure_reason', trip.failure_reason) }}{% endif %}
+      {{ kv('common.notes', trip.notes or '—') }}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    <a class="btn ghost" href="{{ url_for('fleet.trips') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="grid cols-3">
+  <div class="kpi">
+    <div class="label">{{ t('fleet.transport_fee') }}</div>
+    <div class="value">{{ summary.revenue | money }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('fleet.total_cost') }}</div>
+    <div class="value">{{ summary.total_cost | money }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('fleet.margin') }}</div>
+    <div class="value">{{ summary.margin | money }}</div>
+    <div class="small muted">
+      {% if summary.margin_percent is not none %}{{ summary.margin_percent | percent }}{% endif %}
+      {% if summary.cost_per_km is not none %} · {{ summary.cost_per_km | money }} / km{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('fleet.profitability') }}</h2>
+  <table class="data">
+    <tbody>
+      {{ kv('fleet.transport_fee', summary.revenue | money, 'num') }}
+      {{ kv('fleet.carrier_cost', summary.carrier_cost | money, 'num') }}
+      {{ kv('fleet.other_expenses', summary.expenses | money, 'num') }}
+      {{ kv('fleet.total_cost', summary.total_cost | money, 'num') }}
+      {{ kv('fleet.margin', summary.margin | money, 'num') }}
+    </tbody>
+  </table>
+  <p class="small muted">{{ t('fleet.margin_note') }}</p>
+</div>
+
+{% if can('fleet.manage') %}
+<div class="card">
+  <h2>{{ t('fleet.expense_new') }}</h2>
+  <form method="post" action="{{ url_for('fleet.trip_expense_add', trip_id=trip.id) }}">
+    {{ expense_form.hidden_tag() }}
+    <div class="form-grid">
+      {{ field(expense_form.expense_type) }}
+      {{ field(expense_form.amount) }}
+      {{ field(expense_form.expense_date) }}
+      {{ field(expense_form.paid_by) }}
+      {{ field(expense_form.note) }}
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">{{ t('action.save') }}</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>{{ t('fleet.expenses') }}</h2>
+  {% if trip.expenses %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.date') }}</th>
+        <th>{{ t('fleet.expense_type') }}</th>
+        <th class="num">{{ t('payment.amount') }}</th>
+        <th>{{ t('fleet.paid_by') }}</th>
+        <th>{{ t('common.notes') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for expense in trip.expenses %}
+      <tr>
+        <td>{{ expense.expense_date | d }}</td>
+        <td>{{ t('fleet.' + expense.expense_type) }}</td>
+        <td class="num">{{ expense.amount | money }}</td>
+        <td>{{ expense.paid_by or '—' }}</td>
+        <td>{{ expense.note or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+
+{% if can('fleet.manage') and trip.status not in ('completed', 'failed') %}
+<div class="card">
+  <h2>{{ t('common.status') }}</h2>
+  <form method="post" action="{{ url_for('fleet.trip_status', trip_id=trip.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="odometer_start">{{ t('fleet.odometer') }} (start)</label>
+        <input type="text" inputmode="decimal" id="odometer_start" name="odometer_start"
+               value="{{ trip.odometer_start if trip.odometer_start is not none else '' }}">
+      </div>
+      <div class="field">
+        <label for="odometer_end">{{ t('fleet.odometer') }} (end)</label>
+        <input type="text" inputmode="decimal" id="odometer_end" name="odometer_end"
+               value="{{ trip.odometer_end if trip.odometer_end is not none else '' }}">
+      </div>
+      <div class="field">
+        <label for="fail_reason">{{ t('fleet.failure_reason') }}</label>
+        <input type="text" id="fail_reason" name="reason" maxlength="255">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit" name="action" value="start">{{ t('action.update') }}</button>
+      <button class="btn secondary" type="submit" name="action" value="complete">{{ t('fleet.complete_trip') }}</button>
+      <button class="btn secondary" type="submit" name="action" value="fail">{{ t('status.failed') }}</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>{{ t('fleet.deliveries_linked') }}</h2>
+  {% if deliveries %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.number') }}</th>
+        <th>{{ t('common.date') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th>{{ t('common.status') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for delivery in deliveries %}
+      <tr>
+        <td><a href="{{ url_for('sales.delivery_detail', delivery_id=delivery.id) }}">{{ delivery.number }}</a></td>
+        <td>{{ delivery.delivery_date | d }}</td>
+        <td class="num">{{ delivery.total_amount | money }}</td>
+        <td>{{ status_badge(delivery.status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

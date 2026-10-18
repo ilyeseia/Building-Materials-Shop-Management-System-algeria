@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('category.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('category.title') }}</h1>
+
+{% if can('catalog.manage') %}
+{{ render_form(form, cancel_url=url_for('catalog.categories')) }}
+{% endif %}
+
+<div class="card">
+  {% if items %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.code') }}</th>
+        <th>{{ t('common.name_ar') }}</th>
+        <th>{{ t('common.name_fr') }}</th>
+        <th>{{ t('common.name_en') }}</th>
+        <th class="num">{{ t('common.sort_order') }}</th>
+        {% if can('catalog.manage') %}<th>{{ t('common.actions') }}</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for category in items %}
+      <tr>
+        <td class="mono">{{ category.code }}</td>
+        {% if can('catalog.manage') %}
+        {#- The inputs join the per-row form through the HTML ``form`` attribute,
+            which keeps the markup valid (a <form> may not sit inside <tr>). -#}
+        <td><input form="category-{{ category.id }}" type="text" name="name_ar" value="{{ category.name_ar }}"></td>
+        <td><input form="category-{{ category.id }}" type="text" name="name_fr" value="{{ category.name_fr }}"></td>
+        <td><input form="category-{{ category.id }}" type="text" name="name_en" value="{{ category.name_en }}"></td>
+        <td class="num"><input form="category-{{ category.id }}" type="number" name="sort_order" value="{{ category.sort_order }}"></td>
+        <td>
+          <form id="category-{{ category.id }}" method="post"
+                action="{{ url_for('catalog.category_edit', category_id=category.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn small" type="submit">{{ t('action.save') }}</button>
+          </form>
+        </td>
+        {% else %}
+        <td>{{ category.name_ar }}</td>
+        <td>{{ category.name_fr }}</td>
+        <td>{{ category.name_en }}</td>
+        <td class="num">{{ category.sort_order }}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+  <p class="small muted">{{ t('category.seeded_note') }}</p>
+</div>
+{% endblock %}

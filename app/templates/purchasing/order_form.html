@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, line_row %}
+{% block title %}{{ t('purchase.order_new') }}{% endblock %}
+{% block content %}
+<h1>{{ t('purchase.order_new') }}</h1>
+
+<div id="line-data" data-products='{{ products | tojson }}' hidden></div>
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.supplier_id) }}
+    {{ field(form.document_date) }}
+    {{ field(form.expected_date) }}
+    {{ field(form.warehouse_id) }}
+    {{ field(form.supplier_reference) }}
+  </div>
+  {{ field(form.notes) }}
+
+  <table class="lines">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="qty">{{ t('common.quantity') }}</th>
+        <th class="price">{{ t('purchase.item_cost') }}</th>
+        <th class="price">{{ t('common.discount') }}</th>
+        <th>{{ t('common.description') }}</th>
+        <th class="num">{{ t('product.available') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ line_row() }}
+    </tbody>
+  </table>
+
+  <div class="form-actions">
+    <button type="button" class="btn secondary" id="add-line">{{ t('action.add_line') }}</button>
+    <span class="spacer"></span>
+    <span class="small muted">{{ t('common.total') }}: <strong id="preview-subtotal">0.00</strong></span>
+  </div>
+  <div class="form-actions">
+    <button class="btn secondary" type="submit" name="confirm_now" value="1">{{ t('action.save') }} + {{ t('action.confirm') }}</button>
+    <button class="btn" type="submit">{{ t('action.save') }}</button>
+    <a class="btn ghost" href="{{ url_for('purchasing.orders') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

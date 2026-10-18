@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge, settlement_badge %}
+{% block title %}{{ receipt.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('purchase.receipt') }} — {{ receipt.number }} {{ status_badge(receipt.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('purchase.supplier', receipt.supplier.name if receipt.supplier else '—') }}
+      {{ kv('common.date', receipt.receipt_date | d) }}
+      {{ kv('stock.warehouse', localized_name(receipt.warehouse) if receipt.warehouse else '—') }}
+      {% if receipt.order %}{{ kv('purchase.order', receipt.order.number) }}{% endif %}
+      {{ kv('purchase.supplier_reference', receipt.supplier_reference or '—') }}
+      {{ kv('purchase.transport_cost', receipt.transport_cost | money, 'num') }}
+      {{ kv('purchase.handling_cost', receipt.handling_cost | money, 'num') }}
+      {{ kv('purchase.other_cost', receipt.other_cost | money, 'num') }}
+      {{ kv('purchase.landed_cost', receipt.total_landed_cost | money, 'num') }}
+      {{ kv('common.notes', receipt.notes or '—') }}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    {% if can('purchasing.manage') and receipt.status == 'draft' %}
+    <form method="post" action="{{ url_for('purchasing.receipt_post', receipt_id=receipt.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">{{ t('stock.posted') }}</button>
+    </form>
+    {% endif %}
+    {% if can('purchasing.manage') and receipt.status == 'posted' and not invoices %}
+    <form method="post" action="{{ url_for('purchasing.receipt_invoice', receipt_id=receipt.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn secondary" type="submit">{{ t('purchase.supplier_invoice_new') }}</button>
+    </form>
+    {% endif %}
+    {% if can('purchasing.manage') and receipt.status == 'posted' %}
+    <form method="post" action="{{ url_for('purchasing.receipt_cancel', receipt_id=receipt.id) }}" data-confirm="{{ t('action.cancel_document') }}?">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="reason" value="">
+      <button class="btn secondary" type="submit">{{ t('action.cancel_document') }}</button>
+    </form>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('purchasing.receipts') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('sale.lines') }}</h2>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.description') }}</th>
+        <th class="num">{{ t('common.quantity') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="num">{{ t('purchase.item_cost') }}</th>
+        <th class="num">{{ t('common.discount') }}</th>
+        <th class="num">{{ t('purchase.cost_allocated') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in receipt.items %}
+      <tr>
+        <td>{{ item.description or (item.product.name if item.product else '') }}</td>
+        <td class="num">{{ item.quantity | qty }}</td>
+        <td>{{ t('unit.' + item.unit.code) if item.unit else '' }}</td>
+        <td class="num">{{ item.unit_price | money }}</td>
+        <td class="num">{{ item.discount_percent | percent }}</td>
+        <td class="num">{{ item.landed_unit_cost | money }}</td>
+        <td class="num">{{ item.line_total | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <table class="data">
+    <tbody>
+      <tr><th>{{ t('common.subtotal') }}</th><td class="num">{{ receipt.subtotal | money }}</td></tr>
+      <tr><th>{{ t('purchase.landed_cost') }}</th><td class="num">{{ receipt.total_landed_cost | money }}</td></tr>
+      <tr><th>{{ t('common.total') }}</th><td class="num"><strong>{{ receipt.total_amount | money }}</strong></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>{{ t('purchase.supplier_invoices') }}</h2>
+  {% if invoices %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.number') }}</th>
+        <th>{{ t('common.date') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+        <th class="num">{{ t('payment.balance') }}</th>
+        <th>{{ t('payment.status') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for invoice in invoices %}
+      <tr>
+        <td><a href="{{ url_for('purchasing.invoice_detail', invoice_id=invoice.id) }}">{{ invoice.number }}</a></td>
+        <td>{{ invoice.invoice_date | d }}</td>
+        <td class="num">{{ invoice.total_amount | money }}</td>
+        <td class="num">{{ invoice.balance_due | money }}</td>
+        <td>{{ settlement_badge(invoice.settlement_status) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

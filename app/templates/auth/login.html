@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('auth.login_title') }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('auth.login_title') }}</h1>
+  <p class="muted small">{{ t('app.tagline') }}</p>
+  {{ render_form(form) }}
+</div>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "macros.html" import status_badge %}
+{% block title %}{{ t('report.receivables_aging') if kind == 'receivable' else t('report.payables_aging') }}{% endblock %}
+{% block content %}
+<h1>{{ t('report.receivables_aging') if kind == 'receivable' else t('report.payables_aging') }}</h1>
+<p class="small muted">{{ t('common.date') }}: {{ aging.as_of | d }}</p>
+
+<div class="grid cols-3">
+  <div class="kpi">
+    <div class="label">{{ t('common.total') }}</div>
+    <div class="value">{{ aging.total | money }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('aging.current') }}</div>
+    <div class="value">{{ aging.buckets.current | money }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('aging.over_90') }}</div>
+    <div class="value">{{ aging.buckets.over_90 | money }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('aging.current') }}</th>
+        <th>{{ t('aging.d1_30') }}</th>
+        <th>{{ t('aging.d31_60') }}</th>
+        <th>{{ t('aging.d61_90') }}</th>
+        <th>{{ t('aging.over_90') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">{{ aging.buckets.current | money }}</td>
+        <td class="num">{{ aging.buckets.d1_30 | money }}</td>
+        <td class="num">{{ aging.buckets.d31_60 | money }}</td>
+        <td class="num">{{ aging.buckets.d61_90 | money }}</td>
+        <td class="num">{{ aging.buckets.over_90 | money }}</td>
+        <td class="num"><strong>{{ aging.total | money }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('report.customer_sales') if kind == 'receivable' else t('purchase.supplier') }}</h2>
+    {% set by_party = aging.by_customer if kind == 'receivable' else aging.by_supplier %}
+    {% if by_party %}
+    <table class="data">
+      <thead><tr><th>{{ t('common.name') }}</th><th class="num">{{ t('common.total') }}</th></tr></thead>
+      <tbody>
+        {% for row in by_party %}
+        <tr>
+          <td>{{ row.name }}</td>
+          <td class="num">{{ row.balance | money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>{{ t('common.actions') }}</h2>
+    <table class="data">
+      <thead>
+        <tr>
+          <th>{{ t('common.number') }}</th>
+          <th>{{ t('common.date') }}</th>
+          <th>{{ t('print.due_date') }}</th>
+          <th class="num">{{ t('common.total') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in aging.rows[:50] %}
+        <tr>
+          <td class="mono">{{ row.invoice.number }}</td>
+          <td>{{ row.invoice.invoice_date | d }}</td>
+          <td>{{ row.due_date | d }} ({{ row.days_overdue }})</td>
+          <td class="num">{{ row.balance | money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="muted">{{ t('common.no_results') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

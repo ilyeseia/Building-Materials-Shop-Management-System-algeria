@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "macros.html" import status_badge, kv %}
+{% block title %}{{ transfer.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('stock.transfer') }} — {{ transfer.number }} {{ status_badge(transfer.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('common.date', transfer.transfer_date | d) }}
+      {{ kv('stock.source', localized_name(transfer.source_warehouse)) }}
+      {{ kv('stock.destination', localized_name(transfer.destination_warehouse)) }}
+      {{ kv('common.notes', transfer.note or '—') }}
+      {% if transfer.posted_at %}{{ kv('common.updated_at', transfer.posted_at | dt) }}{% endif %}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    {% if can('inventory.manage') and transfer.status == 'draft' %}
+    <form method="post" action="{{ url_for('inventory.transfer_post', transfer_id=transfer.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">{{ t('stock.posted') }}</button>
+    </form>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('inventory.transfers') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <table class="data">
+    <thead><tr><th>{{ t('product.title') }}</th><th class="num">{{ t('common.quantity') }}</th></tr></thead>
+    <tbody>
+      {% for line in transfer.lines %}
+      <tr>
+        <td>{{ line.product.name if line.product else '—' }}</td>
+        <td class="num">{{ line.quantity | qty }}{% if line.product %} {{ t('unit.' + line.product.stock_unit_code) }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

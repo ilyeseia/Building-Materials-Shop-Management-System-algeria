@@ -1,0 +1,53 @@
+# --- Secrets and local configuration ---------------------------------------
+# Never commit real credentials.  Copy .env.example to .env and fill it in.
+.env
+.env.*
+!.env.example
+
+# --- Databases and runtime data --------------------------------------------
+instance/
+*.db
+*.sqlite
+*.sqlite3
+instance/backups/
+
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Virtual environments ---------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# --- Test / coverage artefacts ----------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# --- Editors / OS -----------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+desktop.ini
+
+# --- Local scratch (anchored to the repository root so that package
+#     "__init__.py" files are never accidentally excluded) -------------------
+/_*.py
+/_keyout.txt
+/_smokeout.txt
+/_tb.txt

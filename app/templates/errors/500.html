@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ t('error.server') }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('error.server') }}</h1>
+  <p class="muted">{{ t('error.500_hint') }}</p>
+  <a class="btn secondary" href="{{ url_for('dashboard.index') }}">{{ t('action.back') }}</a>
+</div>
+{% endblock %}

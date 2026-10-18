@@ -1,0 +1,115 @@
+{#- Base layout. Direction comes from the active language, so Arabic mirrors the
+    whole interface through the browser instead of duplicated CSS. -#}
+<!doctype html>
+<html lang="{{ get_locale() }}" dir="{{ text_direction() }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar no-print">
+    <span class="brand">{{ app_name }}</span>
+    {% if current_user.is_authenticated %}
+    <nav>
+      {% if can('dashboard.view') %}<a href="{{ url_for('dashboard.index') }}">{{ t('nav.dashboard') }}</a>{% endif %}
+      {% if can('sales.view') %}
+        <div class="nav-group">{{ t('nav.sales') }}</div>
+        <a href="{{ url_for('sales.quotations') }}">{{ t('sale.quotations') }}</a>
+        <a href="{{ url_for('sales.orders') }}">{{ t('sale.orders') }}</a>
+        <a href="{{ url_for('sales.deliveries') }}">{{ t('sale.deliveries') }}</a>
+        <a href="{{ url_for('sales.invoices') }}">{{ t('sale.invoices') }}</a>
+        {% if can('sales.manage') %}<a href="{{ url_for('sales.direct_sale') }}">{{ t('sale.direct') }}</a>{% endif %}
+      {% endif %}
+      {% if can('purchasing.view') %}
+        <div class="nav-group">{{ t('nav.purchasing') }}</div>
+        <a href="{{ url_for('purchasing.orders') }}">{{ t('purchase.orders') }}</a>
+        <a href="{{ url_for('purchasing.receipts') }}">{{ t('purchase.receipts') }}</a>
+        <a href="{{ url_for('purchasing.invoices') }}">{{ t('purchase.supplier_invoices') }}</a>
+        <a href="{{ url_for('purchasing.returns') }}">{{ t('nav.returns') }}</a>
+      {% endif %}
+      {% if can('inventory.view') %}
+        <div class="nav-group">{{ t('nav.inventory') }}</div>
+        <a href="{{ url_for('inventory.levels') }}">{{ t('stock.levels') }}</a>
+        <a href="{{ url_for('inventory.movements') }}">{{ t('stock.ledger') }}</a>
+        <a href="{{ url_for('inventory.adjustments') }}">{{ t('stock.adjustments') }}</a>
+        <a href="{{ url_for('inventory.transfers') }}">{{ t('stock.transfers') }}</a>
+        <a href="{{ url_for('inventory.counts') }}">{{ t('stock.counts') }}</a>
+      {% endif %}
+      {% if can('catalog.view') %}
+        <div class="nav-group">{{ t('nav.catalog') }}</div>
+        <a href="{{ url_for('catalog.products') }}">{{ t('product.title') }}</a>
+        <a href="{{ url_for('catalog.categories') }}">{{ t('product.categories') }}</a>
+        <a href="{{ url_for('catalog.units') }}">{{ t('unit.title') }}</a>
+        <a href="{{ url_for('catalog.warehouses') }}">{{ t('stock.warehouses') }}</a>
+      {% endif %}
+      <div class="nav-group">{{ t('nav.parties') }}</div>
+      {% if can('customers.view') %}<a href="{{ url_for('parties.customers') }}">{{ t('nav.customers') }}</a>{% endif %}
+      {% if can('suppliers.view') %}<a href="{{ url_for('parties.suppliers') }}">{{ t('nav.suppliers') }}</a>{% endif %}
+      {% if can('payments.view') %}<a href="{{ url_for('finance.payments') }}">{{ t('nav.payments') }}</a>{% endif %}
+      {% if can('weigh.view') and modules is not defined or (modules is defined and modules.weighbridge) %}
+        {% if can('weigh.view') %}
+        <div class="nav-group">{{ t('nav.operations') }}</div>
+        <a href="{{ url_for('weighbridge.tickets') }}">{{ t('weigh.tickets') }}</a>
+        <a href="{{ url_for('weighbridge.devices') }}">{{ t('weigh.devices') }}</a>
+        {% endif %}
+      {% endif %}
+      {% if can('fleet.view') %}
+        <a href="{{ url_for('fleet.trips') }}">{{ t('fleet.trips') }}</a>
+        <a href="{{ url_for('fleet.vehicles') }}">{{ t('fleet.vehicles') }}</a>
+        <a href="{{ url_for('fleet.drivers') }}">{{ t('fleet.drivers') }}</a>
+        <a href="{{ url_for('fleet.carriers') }}">{{ t('fleet.carriers') }}</a>
+      {% endif %}
+      {% if can('reports.view') %}
+        <div class="nav-group">{{ t('nav.reports') }}</div>
+        <a href="{{ url_for('reports.index') }}">{{ t('reports.title') }}</a>
+      {% endif %}
+      {% if can('settings.view') or can('users.view') or can('audit.view') %}
+        <div class="nav-group">{{ t('nav.admin') }}</div>
+        {% if can('settings.view') %}<a href="{{ url_for('settings.index') }}">{{ t('nav.settings') }}</a>{% endif %}
+        {% if can('users.view') or can('users.manage') %}<a href="{{ url_for('users.index') }}">{{ t('nav.users') }}</a>{% endif %}
+        {% if can('audit.view') %}<a href="{{ url_for('audit.index') }}">{{ t('nav.audit') }}</a>{% endif %}
+      {% endif %}
+    </nav>
+    {% endif %}
+  </aside>
+
+  <div class="main">
+    <header class="topbar no-print">
+      <span class="muted small">{{ t('common.today') }}: {{ now_date() if now_date is defined else '' }}</span>
+      <span class="spacer"></span>
+      {% if current_user.is_authenticated %}
+        <span class="small">{{ current_user.full_name or current_user.username }}
+          <span class="badge">{{ t('role.' + current_user.role) }}</span></span>
+        <a class="btn small ghost" href="{{ url_for('auth.change_password') }}">{{ t('auth.change_password') }}</a>
+        <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn small secondary" type="submit">{{ t('auth.sign_out') }}</button>
+        </form>
+      {% endif %}
+      <span class="small">
+        {% for code, label in LANGUAGES.items() %}
+          <a href="{{ url_for('auth.language', code=code) }}"
+             {% if code == get_locale() %}style="font-weight:700"{% endif %}>{{ label }}</a>
+          {% if not loop.last %} · {% endif %}
+        {% endfor %}
+      </span>
+    </header>
+
+    <main class="content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

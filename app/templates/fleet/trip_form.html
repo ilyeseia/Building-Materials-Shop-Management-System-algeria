@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "macros.html" import field %}
+{% block title %}{{ t('fleet.trip_new') }}{% endblock %}
+{% block content %}
+<h1>{{ t('fleet.trip_new') }}</h1>
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.trip_date) }}
+    {{ field(form.planned_date) }}
+    {{ field(form.vehicle_id) }}
+    {{ field(form.driver_id) }}
+    {{ field(form.carrier_id) }}
+    {{ field(form.customer_id) }}
+  </div>
+  <div class="form-grid">
+    {{ field(form.origin) }}
+    {{ field(form.destination) }}
+    {{ field(form.transport_fee) }}
+    {{ field(form.carrier_cost) }}
+  </div>
+  {{ field(form.notes) }}
+  <p class="small muted">{{ t('fleet.margin_note') }}</p>
+
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('action.save') }}</button>
+    <a class="btn ghost" href="{{ url_for('fleet.trips') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

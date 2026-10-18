@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('conversion.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('conversion.title') }} — {{ product.name }}</h1>
+<p class="small muted">{{ t('conversion.density_hint') }}</p>
+
+{% if can('catalog.manage') %}
+{{ render_form(form, cancel_url=url_for('catalog.product_detail', product_id=product.id)) }}
+{% endif %}
+
+<div class="card">
+  {% if conversions %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('conversion.from') }}</th>
+        <th>{{ t('conversion.to') }}</th>
+        <th class="num">{{ t('conversion.factor') }}</th>
+        <th>{{ t('common.type') }}</th>
+        <th>{{ t('conversion.effective_from') }}</th>
+        <th>{{ t('conversion.source') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for conversion in conversions %}
+      <tr>
+        <td>{{ conversion.from_unit.code }}</td>
+        <td>{{ conversion.to_unit.code }}</td>
+        <td class="num">1 {{ conversion.from_unit.code }} = {{ conversion.factor | num(6) }} {{ conversion.to_unit.code }}</td>
+        <td>{{ t('unit.' + conversion.conversion_type) }}</td>
+        <td>{{ conversion.effective_from | d }}</td>
+        <td>{{ conversion.source or '—' }}{% if conversion.notes %} — {{ conversion.notes }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+  <div class="form-actions">
+    <a class="btn secondary" href="{{ url_for('catalog.product_detail', product_id=product.id) }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+{% endblock %}

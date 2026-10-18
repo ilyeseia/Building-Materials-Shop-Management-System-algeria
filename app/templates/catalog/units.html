@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('uom.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('uom.title') }}</h1>
+<p class="small muted">{{ t('uom.factor_hint') }}</p>
+
+{% if can('catalog.manage') %}
+{{ render_form(form, cancel_url=url_for('catalog.units')) }}
+{% endif %}
+
+<div class="card">
+  {% if items %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('uom.code') }}</th>
+        <th>{{ t('uom.kind') }}</th>
+        <th class="num">{{ t('conversion.factor') }}</th>
+        <th>{{ t('uom.name') }}</th>
+        <th>{{ t('unit.allows_fraction') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for unit in items %}
+      <tr>
+        <td class="mono">{{ unit.code }}</td>
+        <td>{{ t('uom.kind.' + unit.kind) }}</td>
+        <td class="num">{{ unit.factor | num(6) }}</td>
+        <td>{{ localized_name(unit) }}</td>
+        <td>{{ t('common.yes') if unit.allows_fraction else t('common.no') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

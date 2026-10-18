@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from "macros.html" import pagination %}
+{#-
+  Generic, data-driven list screen.
+
+  Context contract (see app/blueprints/*.py):
+    title_key     catalogue key for the page heading
+    rows          list of dicts of *preformatted* strings; an optional ``_url``
+                  turns the first column into a link to the record
+    columns       list of {key, label} describing the table columns
+    result        pagination dict from app.services.reporting.paginate
+    search        current search text ('' when the view is not searchable)
+    search_url    endpoint used by the filter/search form
+    searchable    optional flag enabling the search box
+    create_url    optional URL for the "new" button
+    extra_filters optional single select filter: {name,label,selected,options}
+-#}
+{% block title %}{{ t(title_key) }}{% endblock %}
+{% block content %}
+<h1>{{ t(title_key) }}</h1>
+
+<form method="get" action="{{ search_url }}" class="card no-print" id="list-filters">
+  <div class="form-grid">
+    {% if searchable is defined and searchable %}
+    <div class="field">
+      <label for="q">{{ t('action.search') }}</label>
+      <input type="search" id="q" name="q" value="{{ search or '' }}">
+    </div>
+    {% endif %}
+    {% if extra_filters is defined and extra_filters %}
+    <div class="field">
+      <label for="filter-{{ extra_filters.name }}">{{ t(extra_filters.label) }}</label>
+      <select id="filter-{{ extra_filters.name }}" name="{{ extra_filters.name }}" data-autosubmit>
+        {% for value, label in extra_filters.options %}
+          <option value="{{ '' if value is none else value }}"
+                  {% if (value is none and not extra_filters.selected) or (value is not none and extra_filters.selected is not none and value|string == extra_filters.selected|string) %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+  </div>
+  <div class="form-actions">
+    {% if searchable is defined and searchable %}<button class="btn" type="submit">{{ t('action.search') }}</button>{% endif %}
+    <a class="btn ghost" href="{{ search_url }}">{{ t('action.reset') }}</a>
+    {% if create_url %}
+      <span class="spacer"></span>
+      <a class="btn" href="{{ create_url }}">{{ t('action.new') }}</a>
+    {% endif %}
+  </div>
+</form>
+
+<div class="card">
+  {% if rows %}
+  <table class="data">
+    <thead>
+      <tr>
+        {% for column in columns %}<th>{{ t(column.label) }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        {% for column in columns %}
+          {% if loop.first and row._url %}
+            <td><a href="{{ row._url }}">{{ row[column.key] }}</a></td>
+          {% else %}
+            <td>{{ row[column.key] }}</td>
+          {% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+
+{% set extra = {} %}
+{% if searchable is defined and searchable and search %}
+  {% set _ = extra.update({'q': search}) %}
+{% endif %}
+{% if extra_filters is defined and extra_filters and extra_filters.selected not in (none, '', 0, '0') %}
+  {% set _ = extra.update({extra_filters.name: extra_filters.selected}) %}
+{% endif %}
+{{ pagination(result, search_url, extra) }}
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('fleet.carriers') }}{% endblock %}
+{% block content %}
+<h1>{{ t('fleet.carriers') }}</h1>
+
+{% if can('fleet.manage') %}
+{{ render_form(form, cancel_url=url_for('fleet.carriers')) }}
+{% endif %}
+
+<div class="card">
+  {% if items %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.name') }}</th>
+        <th>{{ t('party.contact_person') }}</th>
+        <th>{{ t('common.phone') }}</th>
+        <th>{{ t('party.tax_id') }}</th>
+        <th class="num">{{ t('carrier.default_rate') }}</th>
+        <th>{{ t('common.status') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for carrier in items %}
+      <tr>
+        <td>{{ carrier.name }}</td>
+        <td>{{ carrier.contact_person or '—' }}</td>
+        <td class="mono">{{ carrier.phone or '—' }}</td>
+        <td class="mono">{{ carrier.tax_id or '—' }}</td>
+        <td class="num">{{ carrier.default_rate | money if carrier.default_rate is not none else '—' }}</td>
+        <td>{{ t('status.active') if carrier.is_active else t('status.inactive') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

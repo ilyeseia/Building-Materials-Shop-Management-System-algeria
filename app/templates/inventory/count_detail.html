@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "macros.html" import status_badge, kv %}
+{% block title %}{{ count.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('stock.count') }} — {{ count.number }} {{ status_badge(count.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('common.date', count.count_date | d) }}
+      {{ kv('stock.warehouse', localized_name(count.warehouse)) }}
+      {{ kv('common.notes', count.note or '—') }}
+      {% if count.posted_at %}{{ kv('common.updated_at', count.posted_at | dt) }}{% endif %}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    {% if can('inventory.manage') and count.status == 'draft' %}
+    <form method="post" action="{{ url_for('inventory.count_post', count_id=count.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">{{ t('stock.post_count') }}</button>
+    </form>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('inventory.counts') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th class="num">{{ t('product.on_hand') }}</th>
+        <th class="num">{{ t('stock.counted_qty') }}</th>
+        <th class="num">{{ t('stock.difference') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in count.lines %}
+      <tr>
+        <td>{{ line.product.name if line.product else '—' }}</td>
+        <td class="num">{{ line.system_quantity | qty }}</td>
+        <td class="num">{{ line.counted_quantity | qty }}</td>
+        <td class="num">{{ line.difference | qty }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

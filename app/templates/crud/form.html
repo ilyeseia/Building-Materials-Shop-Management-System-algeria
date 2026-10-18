@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{#-
+  Generic create/edit screen: one WTForms form rendered as a card.
+
+  Context contract: ``form``, ``title_key`` and an optional ``cancel_url``.
+-#}
+{% block title %}{{ t(title_key) }}{% endblock %}
+{% block content %}
+<h1>{{ t(title_key) }}</h1>
+{{ render_form(form, cancel_url=cancel_url if cancel_url is defined else None) }}
+{% endblock %}

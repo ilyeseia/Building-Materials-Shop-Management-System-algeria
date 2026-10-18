@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge, document_lines, totals_block %}
+{% block title %}{{ quotation.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('sale.quotation') }} — {{ quotation.number }} {{ status_badge(quotation.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('sale.customer', quotation.customer.name if quotation.customer else '—') }}
+      {{ kv('common.date', quotation.quotation_date | d) }}
+      {{ kv('sale.valid_until', quotation.valid_until | d) }}
+      {{ kv('sale.price_list', t('sale.price_list.' + quotation.price_list)) }}
+      {{ kv('stock.warehouse', localized_name(quotation.warehouse) if quotation.warehouse else '—') }}
+      {{ kv('common.notes', quotation.notes or '—') }}
+      {% if quotation.cancelled_at %}
+        {{ kv('sale.cancelled', quotation.cancelled_at | dt) }}
+        {{ kv('common.reason', quotation.cancel_reason or '—') }}
+      {% endif %}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    {% if can('sales.manage') and quotation.status in ('draft', 'sent') %}
+    <form method="post" action="{{ url_for('sales.quotation_accept', quotation_id=quotation.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">{{ t('sale.convert_to_order') }}</button>
+    </form>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('sales.quotations') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('sale.lines') }}</h2>
+  {{ document_lines(quotation.items) }}
+  {{ totals_block(quotation) }}
+</div>
+{% endblock %}

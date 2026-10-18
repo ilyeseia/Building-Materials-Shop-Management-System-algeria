@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "macros.html" import pagination %}
+{% block title %}{{ t('audit.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('audit.title') }}</h1>
+<p class="small muted">{{ t('audit.details') }}</p>
+
+<form method="get" action="{{ url_for('audit.index') }}" class="card no-print">
+  <div class="form-grid">
+    <div class="field">
+      <label for="action">{{ t('audit.event') }}</label>
+      <select id="action" name="action" data-autosubmit>
+        <option value="">{{ t('common.all') }}</option>
+        {% for value in actions %}
+        <option value="{{ value }}" {% if filters.action == value %}selected{% endif %}>{{ t('audit.' + value) if ('audit.' + value) in CATALOGUES['en'] else value }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="entity">{{ t('audit.entity') }}</label>
+      <select id="entity" name="entity" data-autosubmit>
+        <option value="">{{ t('common.all') }}</option>
+        {% for value in entities %}
+        <option value="{{ value }}" {% if filters.entity == value %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="actor">{{ t('audit.actor') }}</label>
+      <select id="actor" name="actor" data-autosubmit>
+        <option value="">{{ t('common.all') }}</option>
+        {% for user in users %}
+        <option value="{{ user.id }}" {% if filters.actor == user.id %}selected{% endif %}>{{ user.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="from">{{ t('report.start_date') }}</label>
+      <input type="date" id="from" name="from">
+    </div>
+    <div class="field">
+      <label for="to">{{ t('report.end_date') }}</label>
+      <input type="date" id="to" name="to">
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('action.filter') }}</button>
+    <a class="btn ghost" href="{{ url_for('audit.index') }}">{{ t('action.reset') }}</a>
+  </div>
+</form>
+
+<div class="card">
+  {% if rows %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('audit.timestamp') }}</th>
+        <th>{{ t('audit.actor') }}</th>
+        <th>{{ t('audit.event') }}</th>
+        <th>{{ t('audit.entity') }}</th>
+        <th>{{ t('audit.details') }}</th>
+        <th>{{ t('audit.ip') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="mono">{{ row.when }}</td>
+        <td>{{ row.actor }}</td>
+        <td>{{ t('audit.' + row.action) if ('audit.' + row.action) in CATALOGUES['en'] else row.action }}</td>
+        <td class="mono">{{ row.entity }}</td>
+        <td>{{ row.summary }}</td>
+        <td class="mono">{{ row.ip }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+
+{{ pagination(result, url_for('audit.index'), {'action': filters.action, 'entity': filters.entity, 'actor': filters.actor}) }}
+{% endblock %}

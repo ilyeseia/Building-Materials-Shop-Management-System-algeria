@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ t('report.weights') }}{% endblock %}
+{% block content %}
+<h1>{{ t('report.weights') }}</h1>
+
+<form method="get" action="{{ url_for('reports.weighing_report') }}" class="card no-print">
+  <div class="form-grid">
+    <div class="field">
+      <label for="from">{{ t('report.start_date') }}</label>
+      <input type="date" id="from" name="from" value="{{ period[0].isoformat() }}">
+    </div>
+    <div class="field">
+      <label for="to">{{ t('report.end_date') }}</label>
+      <input type="date" id="to" name="to" value="{{ period[1].isoformat() }}">
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('report.generate') }}</button>
+  </div>
+</form>
+
+<div class="grid cols-3">
+  <div class="kpi">
+    <div class="label">{{ t('weigh.tickets') }}</div>
+    <div class="value">{{ summary.total_count }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('print.total_net_weight') }}</div>
+    <div class="value">{{ summary.total_net_kg | qty_unit('kg') }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('report.discrepancies') }}</div>
+    <div class="value">{{ summary.tolerance_exceeded }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('report.period') }}: {{ period[0] | d }} — {{ period[1] | d }}</h2>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('weigh.direction') }}</th>
+        <th class="num">{{ t('weigh.tickets') }}</th>
+        <th class="num">{{ t('print.total_net_weight') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{ t('weigh.inbound') }}</td>
+        <td class="num">{{ summary.inbound.count }}</td>
+        <td class="num">{{ summary.inbound.net_kg | qty_unit('kg') }}</td>
+      </tr>
+      <tr>
+        <td>{{ t('weigh.outbound') }}</td>
+        <td class="num">{{ summary.outbound.count }}</td>
+        <td class="num">{{ summary.outbound.net_kg | qty_unit('kg') }}</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <th>{{ t('common.total') }}</th>
+        <td class="num">{{ summary.total_count }}</td>
+        <td class="num"><strong>{{ summary.total_net_kg | qty_unit('kg') }}</strong></td>
+      </tr>
+    </tfoot>
+  </table>
+  <p class="small muted">{{ t('weigh.tolerance_warning') }}</p>
+</div>
+{% endblock %}

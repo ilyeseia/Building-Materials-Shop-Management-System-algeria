@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge, totals_block, settlement_badge %}
+{% block title %}{{ order.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('sale.order') }} — {{ order.number }} {{ status_badge(order.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('sale.customer', order.customer.name if order.customer else '—') }}
+      {{ kv('common.date', order.order_date | d) }}
+      {{ kv('sale.delivery_date', order.delivery_date | d) }}
+      {{ kv('stock.warehouse', localized_name(order.warehouse) if order.warehouse else '—') }}
+      {{ kv('sale.price_list', t('sale.price_list.' + order.price_list)) }}
+      {{ kv('sale.delivery_address', order.delivery_address or '—') }}
+      {{ kv('stock.reserve', t('common.yes') if order.stock_reserved else t('common.no')) }}
+      {{ kv('common.notes', order.notes or '—') }}
+      {% if order.cancelled_at %}
+        {{ kv('sale.cancelled', order.cancelled_at | dt) }}
+        {{ kv('common.reason', order.cancel_reason or '—') }}
+      {% endif %}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    {% if can('sales.manage') and order.status == 'draft' %}
+    <form method="post" action="{{ url_for('sales.order_confirm', order_id=order.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn" type="submit">{{ t('sale.confirm_order') }}</button>
+    </form>
+    {% endif %}
+    {% if can('sales.manage') and order.status in ('confirmed', 'partially_delivered') %}
+    <a class="btn" href="{{ url_for('sales.order_deliver', order_id=order.id) }}">{{ t('sale.create_delivery') }}</a>
+    {% endif %}
+    {% if can('sales.manage') and order.status not in ('delivered', 'invoiced', 'cancelled') %}
+    <form method="post" action="{{ url_for('sales.order_cancel', order_id=order.id) }}" data-confirm="{{ t('action.cancel_document') }}?">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="reason" value="">
+      <button class="btn secondary" type="submit">{{ t('action.cancel_document') }}</button>
+    </form>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('sales.orders') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('sale.lines') }}</h2>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.description') }}</th>
+        <th class="num">{{ t('common.quantity') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="num">{{ t('common.unit_price') }}</th>
+        <th class="num">{{ t('common.discount') }}</th>
+        <th class="num">{{ t('sale.delivered_total') }}</th>
+        <th class="num">{{ t('sale.deliver_remaining') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in order.items %}
+      <tr>
+        <td>{{ item.description or (item.product.name if item.product else '') }}</td>
+        <td class="num">{{ item.quantity | qty }}</td>
+        <td>{{ t('unit.' + item.unit.code) if item.unit else '' }}</td>
+        <td class="num">{{ item.unit_price | money }}</td>
+        <td class="num">{{ item.discount_percent | percent }}</td>
+        <td class="num">{{ item.delivered_quantity | qty }}</td>
+        <td class="num">{{ item.remaining_to_deliver | qty }}</td>
+        <td class="num">{{ item.line_total | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {{ totals_block(order) }}
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('sale.deliveries') }}</h2>
+    {% if deliveries %}
+    <table class="data">
+      <thead>
+        <tr>
+          <th>{{ t('common.number') }}</th>
+          <th>{{ t('common.date') }}</th>
+          <th class="num">{{ t('common.total') }}</th>
+          <th>{{ t('common.status') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for note in deliveries %}
+        <tr>
+          <td><a href="{{ url_for('sales.delivery_detail', delivery_id=note.id) }}">{{ note.number }}</a></td>
+          <td>{{ note.delivery_date | d }}</td>
+          <td class="num">{{ note.total_amount | money }}</td>
+          <td>{{ status_badge(note.status) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>{{ t('sale.invoices') }}</h2>
+    {% if invoices %}
+    <table class="data">
+      <thead>
+        <tr>
+          <th>{{ t('common.number') }}</th>
+          <th>{{ t('common.date') }}</th>
+          <th class="num">{{ t('common.total') }}</th>
+          <th>{{ t('common.status') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in invoices %}
+        <tr>
+          <td><a href="{{ url_for('sales.invoice_detail', invoice_id=invoice.id) }}">{{ invoice.number }}</a></td>
+          <td>{{ invoice.invoice_date | d }}</td>
+          <td class="num">{{ invoice.total_amount | money }}</td>
+          <td>{{ settlement_badge(invoice.settlement_status) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

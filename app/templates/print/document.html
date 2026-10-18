@@ -1,0 +1,123 @@
+{#- Printable document.
+
+    The primary printable output is this print-optimised HTML page (``Ctrl+P``
+    produces the PDF from the browser); a server-side PDF is offered as a
+    secondary option where a Unicode font is available.  All business identity
+    comes from ``BusinessSettings`` — nothing is hard-coded, and no placeholder
+    identity is ever printed. -#}
+<!doctype html>
+<html lang="{{ get_locale() }}" dir="{{ text_direction() }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t('print.' + kind) }} {{ document.number or '' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body class="print-document">
+{% set business = g.settings %}
+<div class="print-toolbar no-print">
+  <button class="btn" data-print type="button">{{ t('action.print') }}</button>
+  <a class="btn ghost" href="{{ url_for('sales.invoice_detail', invoice_id=document.id) if kind == 'invoice' else '#' }}">{{ t('action.back') }}</a>
+</div>
+
+<div class="document-sheet">
+  <header class="document-header">
+    <div>
+      <h1>{{ business.business_name if business else app_name }}</h1>
+      {% if business %}
+        {% if business.legal_name %}<p>{{ business.legal_name }}</p>{% endif %}
+        {% if business.activity %}<p>{{ business.activity }}</p>{% endif %}
+        <p>
+          {% if business.street %}{{ business.street }}, {% endif %}
+          {% if business.commune %}{{ business.commune }}{% endif %}
+          {% if business.wilaya_code %} — {{ wilaya_name(business.wilaya_code) }}{% endif %}
+        </p>
+        {% if business.phone %}<p>{{ t('common.phone') }}: {{ business.phone }}</p>{% endif %}
+        {% if business.email %}<p>{{ t('common.email') }}: {{ business.email }}</p>{% endif %}
+        {% if business.tax_id %}<p>{{ t('party.tax_id') }}: {{ business.tax_id }}</p>{% endif %}
+        {% if business.registry_no %}<p>{{ t('party.registry_no') }}: {{ business.registry_no }}</p>{% endif %}
+      {% endif %}
+    </div>
+    <div class="document-title">
+      <h2>{{ t('print.' + kind) }}</h2>
+      <p class="mono">{{ t('print.document_no') }}: {{ document.number or '—' }}</p>
+      <p>{{ t('print.date') }}: {{ document.invoice_date | d }}</p>
+      {% if kind == 'invoice' and document.due_date %}
+        <p>{{ t('print.due_date') }}: {{ document.due_date | d }}</p>
+      {% endif %}
+    </div>
+  </header>
+
+  <section class="document-parties">
+    <div>
+      <h3>{{ t('print.billed_to') }}</h3>
+      <p><strong>{{ document.customer.name if document.customer else '—' }}</strong></p>
+      {% if document.customer %}
+        {% if document.customer.street %}<p>{{ document.customer.street }}</p>{% endif %}
+        <p>
+          {% if document.customer.commune %}{{ document.customer.commune }}{% endif %}
+          {% if document.customer.wilaya_code %} — {{ wilaya_name(document.customer.wilaya_code) }}{% endif %}
+        </p>
+        {% if document.customer.phone %}<p>{{ t('common.phone') }}: {{ document.customer.phone }}</p>{% endif %}
+        {% if document.customer.tax_id %}<p>{{ t('party.tax_id') }}: {{ document.customer.tax_id }}</p>{% endif %}
+      {% endif %}
+    </div>
+  </section>
+
+  <table class="data document-lines">
+    <thead>
+      <tr>
+        <th>{{ t('common.description') }}</th>
+        <th class="num">{{ t('common.quantity') }}</th>
+        <th>{{ t('common.unit') }}</th>
+        <th class="num">{{ t('common.unit_price') }}</th>
+        <th class="num">{{ t('common.discount') }}</th>
+        <th class="num">{{ t('common.total') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in document.items %}
+      <tr>
+        <td>{{ item.description or (item.product.name if item.product else '') }}</td>
+        <td class="num">{{ item.quantity | qty }}</td>
+        <td>{{ t('unit.' + item.unit.code) if item.unit else '' }}</td>
+        <td class="num">{{ item.unit_price | money }}</td>
+        <td class="num">{{ item.discount_percent | percent }}</td>
+        <td class="num">{{ item.line_total | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="data document-totals">
+    <tbody>
+      <tr><th>{{ t('common.subtotal') }}</th><td class="num">{{ document.subtotal | money }}</td></tr>
+      <tr><th>{{ t('common.discount') }}</th><td class="num">{{ document.discount_amount | money }}</td></tr>
+      <tr><th>{{ t('common.tax') }}</th><td class="num">{{ document.tax_amount | money }}</td></tr>
+      <tr><th>{{ t('common.total') }}</th><td class="num"><strong>{{ document.total_amount | money }}</strong></td></tr>
+      {% if kind == 'invoice' %}
+      <tr><th>{{ t('sale.paid') }}</th><td class="num">{{ document.paid_amount | money }}</td></tr>
+      <tr><th>{{ t('sale.balance_due') }}</th><td class="num"><strong>{{ document.balance_due | money }}</strong></td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  {% if document.notes %}<p class="small">{{ document.notes }}</p>{% endif %}
+  {% if business and business.bank_details %}
+    <section class="document-footer">
+      <h3>{{ t('print.bank_details') }}</h3>
+      <p class="small">{{ business.bank_details }}</p>
+    </section>
+  {% endif %}
+  {% if business and business.invoice_footer %}
+    <p class="small muted">{{ business.invoice_footer }}</p>
+  {% endif %}
+
+  <section class="document-signatures">
+    <div><p>{{ t('print.signature') }}</p></div>
+    <div><p>{{ t('print.received_by') }}</p></div>
+  </section>
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

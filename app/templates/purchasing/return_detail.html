@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge, document_lines, totals_block %}
+{% block title %}{{ document.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('sale.return_new') }} — {{ document.number }} {{ status_badge(document.status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('purchase.supplier', document.supplier.name if document.supplier else '—') }}
+      {{ kv('common.date', document.return_date | d) }}
+      {{ kv('stock.warehouse', localized_name(document.warehouse) if document.warehouse else '—') }}
+      {{ kv('common.reason', document.reason) }}
+      {{ kv('common.notes', document.notes or '—') }}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    <a class="btn ghost" href="{{ url_for('purchasing.returns') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('sale.lines') }}</h2>
+  {{ document_lines(document.items) }}
+  {{ totals_block(document) }}
+</div>
+{% endblock %}

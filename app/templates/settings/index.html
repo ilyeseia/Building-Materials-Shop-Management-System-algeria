@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form %}
+{% block title %}{{ t('settings.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('settings.title') }}</h1>
+<p class="small muted">{{ t('settings.regulatory_note') }}</p>
+
+{% if can('settings.manage') %}
+{{ render_form(form, cancel_url=url_for('settings.index')) }}
+{% else %}
+<div class="card">
+  <table class="data">
+    <tbody>
+      <tr><th>{{ t('settings.business_name') }}</th><td>{{ settings.business_name }}</td></tr>
+      <tr><th>{{ t('settings.legal_name') }}</th><td>{{ settings.legal_name or '—' }}</td></tr>
+      <tr><th>{{ t('common.phone') }}</th><td>{{ settings.phone or '—' }}</td></tr>
+      <tr><th>{{ t('common.email') }}</th><td>{{ settings.email or '—' }}</td></tr>
+      <tr><th>{{ t('common.currency') }}</th><td>{{ settings.currency }} ({{ settings.currency_symbol }})</td></tr>
+      <tr><th>{{ t('settings.timezone') }}</th><td>{{ settings.timezone }}</td></tr>
+      <tr><th>{{ t('settings.vat_rate') }}</th><td>{{ settings.vat_rate | percent }}</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('settings.modules') }}</h2>
+    <table class="data">
+      <tbody>
+        <tr><th>{{ t('nav.weighbridge') }}</th><td>{{ t('common.yes') if settings.enable_weighbridge else t('common.no') }}</td></tr>
+        <tr><th>{{ t('nav.fleet') }}</th><td>{{ t('common.yes') if settings.enable_fleet else t('common.no') }}</td></tr>
+        <tr><th>{{ t('settings.enable_accounting') }}</th><td>{{ t('common.yes') if settings.enable_accounting else t('common.no') }}</td></tr>
+        <tr><th>{{ t('settings.allow_negative_stock') }}</th><td>{{ t('common.yes') if settings.allow_negative_stock else t('common.no') }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>{{ t('settings.numbering') }}</h2>
+    <p class="small muted">{{ t('settings.numbering_hint') }}</p>
+  </div>
+</div>
+{% endblock %}

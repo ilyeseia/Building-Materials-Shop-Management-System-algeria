@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros.html" import render_form, kv %}
+{% block title %}{{ t('wh.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('wh.title') }}</h1>
+
+{% if can('catalog.manage') %}
+{{ render_form(form, cancel_url=url_for('catalog.warehouses')) }}
+{% endif %}
+
+<div class="card">
+  {% if items %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.code') }}</th>
+        <th>{{ t('wh.name') }}</th>
+        <th>{{ t('wh.location') }}</th>
+        <th>{{ t('address.wilaya') }}</th>
+        <th>{{ t('wh.is_default') }}</th>
+        <th>{{ t('common.actions') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for warehouse in items %}
+      <tr>
+        <td class="mono">{{ warehouse.code }}</td>
+        <td>{{ localized_name(warehouse) }}</td>
+        <td>{{ warehouse.location or '—' }}</td>
+        <td>{{ wilaya_name(warehouse.wilaya_code) or '—' }}</td>
+        <td>{{ t('common.yes') if warehouse.is_default else t('common.no') }}</td>
+        <td><a class="btn small secondary" href="{{ url_for('inventory.levels', warehouse=warehouse.id) }}">{{ t('stock.levels') }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

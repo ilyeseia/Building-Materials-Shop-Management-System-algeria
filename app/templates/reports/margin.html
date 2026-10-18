@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ t('report.gross_margin') }}{% endblock %}
+{% block content %}
+<h1>{{ t('report.gross_margin') }}</h1>
+
+<form method="get" action="{{ url_for('reports.margin_report') }}" class="card no-print">
+  <div class="form-grid">
+    <div class="field">
+      <label for="from">{{ t('report.start_date') }}</label>
+      <input type="date" id="from" name="from" value="{{ period[0].isoformat() }}">
+    </div>
+    <div class="field">
+      <label for="to">{{ t('report.end_date') }}</label>
+      <input type="date" id="to" name="to" value="{{ period[1].isoformat() }}">
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('report.generate') }}</button>
+  </div>
+</form>
+
+<div class="card">
+  <h2>{{ t('report.period') }}: {{ period[0] | d }} — {{ period[1] | d }}</h2>
+  {% if rows %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.description') }}</th>
+        <th class="num">{{ t('report.gross_margin') }}</th>
+        <th class="num">{{ t('product.cost_price') }}</th>
+        <th class="num">{{ t('fleet.margin') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.key }}</td>
+        <td class="num">{{ row.revenue | money }}</td>
+        <td class="num">{{ row.cost | money }}</td>
+        <td class="num">{{ row.margin | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <th>{{ t('common.total') }}</th>
+        <td class="num">{{ (rows | sum(attribute='revenue')) | money }}</td>
+        <td class="num">{{ (rows | sum(attribute='cost')) | money }}</td>
+        <td class="num"><strong>{{ (rows | sum(attribute='margin')) | money }}</strong></td>
+      </tr>
+    </tfoot>
+  </table>
+  <p class="small muted">{{ t('report.margin_note') }}</p>
+  {% else %}
+  <p class="muted">{{ t('report.no_cost_data') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

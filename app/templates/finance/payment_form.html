@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, checkbox %}
+{% block title %}{{ t('payment.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('payment.title') }}</h1>
+<p class="small muted">{{ t('payment.form_note') }}</p>
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.direction, id='direction-field') }}
+    {{ field(form.payment_date) }}
+    {{ field(form.amount) }}
+    {{ field(form.method) }}
+    {{ field(form.reference) }}
+  </div>
+
+  {#- ``setupPaymentToggle`` in app.js shows the party matching the direction. -#}
+  <div class="form-grid">
+    <div data-party="customer">{{ field(form.customer_id) }}</div>
+    <div data-party="supplier">{{ field(form.supplier_id) }}</div>
+  </div>
+
+  {{ field(form.notes) }}
+  {{ checkbox(form.auto_allocate) }}
+  <p class="small muted">{{ t('payment.auto_allocate_note') }}</p>
+
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('action.save') }}</button>
+    <a class="btn ghost" href="{{ url_for('finance.payments') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ t('report.stock_valuation') }}{% endblock %}
+{% block content %}
+<h1>{{ t('report.stock_valuation') }}</h1>
+
+<form method="get" action="{{ url_for('reports.stock_report') }}" class="card no-print">
+  <div class="form-grid">
+    <div class="field">
+      <label for="warehouse">{{ t('stock.warehouse') }}</label>
+      <select id="warehouse" name="warehouse" data-autosubmit>
+        <option value="">{{ t('common.all') }}</option>
+        {% for warehouse in warehouses %}
+        <option value="{{ warehouse.id }}" {% if warehouse_id == warehouse.id %}selected{% endif %}>{{ localized_name(warehouse) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" type="submit">{{ t('action.filter') }}</button>
+    <a class="btn ghost" href="{{ url_for('reports.stock_report') }}">{{ t('action.reset') }}</a>
+  </div>
+</form>
+
+<div class="card">
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th class="num">{{ t('stock.on_hand') }}</th>
+        <th class="num">{{ t('stock.reserved') }}</th>
+        <th class="num">{{ t('stock.available') }}</th>
+        <th class="num">{{ t('stock.avg_cost') }}</th>
+        <th class="num">{{ t('stock.value') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td><a href="{{ url_for('catalog.product_detail', product_id=row.product_id) }}">{{ row.name }}</a></td>
+        <td class="num">{{ row.quantity | qty }}</td>
+        <td class="num">{{ row.reserved | qty }}</td>
+        <td class="num">{{ row.available | qty }}</td>
+        <td class="num">{{ row.avg_cost | money }}</td>
+        <td class="num">{{ row.value | money }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">{{ t('common.no_results') }}</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><th colspan="5">{{ t('common.total') }}</th><td class="num"><strong>{{ total | money }}</strong></td></tr>
+    </tfoot>
+  </table>
+  <p class="small muted">{{ t('report.valuation_note') }}</p>
+</div>
+
+<div class="card">
+  <h2>{{ t('dashboard.low_stock') }}</h2>
+  {% if low_stock %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('product.title') }}</th>
+        <th class="num">{{ t('product.available') }}</th>
+        <th class="num">{{ t('product.reorder_level') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in low_stock %}
+      <tr>
+        <td><a href="{{ url_for('catalog.product_detail', product_id=row.product_id) }}">{{ row.name }}</a></td>
+        <td class="num">{{ row.available | qty }}</td>
+        <td class="num">{{ row.reorder_level | qty }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge %}
+{% block title %}{{ ticket.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('weigh.ticket') }} — {{ ticket.number }} {{ status_badge(ticket.status) }}
+    <span class="badge">{{ t('weigh.' + ticket.direction) }}</span>
+    {% if ticket.tolerance_exceeded %}<span class="badge blocked">{{ t('weigh.discrepancy') }}</span>{% endif %}
+  </h1>
+  <table class="data">
+    <tbody>
+      {{ kv('common.date', ticket.ticket_date | d) }}
+      {{ kv('weigh.plate', ticket.plate or '—', 'mono') }}
+      {{ kv('weigh.driver', ticket.driver_name or '—') }}
+      {{ kv('weigh.material', ticket.product.name if ticket.product else '—') }}
+      {{ kv('stock.warehouse', localized_name(ticket.warehouse) if ticket.warehouse else '—') }}
+      {% if ticket.customer %}{{ kv('sale.customer', ticket.customer.name) }}{% endif %}
+      {% if ticket.supplier %}{{ kv('purchase.supplier', ticket.supplier.name) }}{% endif %}
+      {{ kv('weigh.device', ticket.device.name if ticket.device else t('weigh.device_none')) }}
+      {{ kv('weigh.gross', (ticket.gross_weight | qty_unit('kg')) if ticket.gross_weight is not none else '—', 'num') }}
+      {{ kv('weigh.tare', (ticket.tare_weight | qty_unit('kg')) if ticket.tare_weight is not none else '—', 'num') }}
+      {{ kv('weigh.net', (ticket.net_weight | qty_unit('kg')) if ticket.net_weight is not none else '—', 'num') }}
+      {% if ticket.expected_quantity is not none %}{{ kv('weigh.expected', ticket.expected_quantity | qty) }}{% endif %}
+      {% if ticket.estimated_volume_m3 is not none %}{{ kv('weigh.estimated_volume', ticket.estimated_volume_m3 | qty_unit('m3')) }}{% endif %}
+      {% if ticket.density_used_kg_m3 is not none %}{{ kv('weigh.density_used', ticket.density_used_kg_m3 | qty) }}{% endif %}
+      {{ kv('weigh.source', t('status.' + ticket.gross_source)) }}
+      {{ kv('weigh.operator', ticket.operator.full_name if ticket.operator else '—') }}
+      {{ kv('common.notes', ticket.notes or '—') }}
+    </tbody>
+  </table>
+
+  {% if net_in_stock %}
+  <div class="flash {{ 'warning' if net_in_stock.error is defined else 'info' }}">
+    {% if net_in_stock.error is defined %}
+      {{ t(net_in_stock.error) }}
+    {% else %}
+      {{ t('weigh.net') }}: {{ net_in_stock.quantity | qty_unit(net_in_stock.unit) }}
+      {% if net_in_stock.estimate %}<span class="badge estimated">{{ t('status.estimated') }}</span>{% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="form-actions">
+    {% if can('weigh.manage') %}
+      {% if ticket.status == 'pending_approval' %}
+      <form method="post" action="{{ url_for('weighbridge.ticket_approve', ticket_id=ticket.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="discrepancy_note" value="{{ ticket.discrepancy_note or '' }}">
+        <button class="btn" type="submit">{{ t('weigh.approve') }}</button>
+        <button class="btn secondary" type="submit" name="post_now" value="1">{{ t('weigh.approve') }} + {{ t('stock.posted') }}</button>
+      </form>
+      {% endif %}
+      {% if ticket.is_approved and not ticket.is_posted %}
+      <form method="post" action="{{ url_for('weighbridge.ticket_post', ticket_id=ticket.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn" type="submit">{{ t('weigh.post_to_stock') }}</button>
+      </form>
+      {% endif %}
+      {% if ticket.status != 'cancelled' %}
+      <form method="post" action="{{ url_for('weighbridge.ticket_cancel', ticket_id=ticket.id) }}"
+            data-confirm="{{ t('action.cancel_document') }}?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="reason" value="">
+        <button class="btn secondary" type="submit">{{ t('action.cancel_document') }}</button>
+      </form>
+      {% endif %}
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('weighbridge.tickets') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+{% if can('weigh.manage') and ticket.status != 'cancelled' %}
+<div class="card">
+  <h2>{{ t('weigh.manual_entry') }}</h2>
+  <form method="post" action="{{ url_for('weighbridge.ticket_weigh', ticket_id=ticket.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="gross_weight">{{ t('weigh.gross') }}</label>
+        <input type="text" inputmode="decimal" id="gross_weight" name="gross_weight"
+               value="{{ ticket.gross_weight if ticket.gross_weight is not none else '' }}">
+      </div>
+      <div class="field">
+        <label for="tare_weight">{{ t('weigh.tare') }}</label>
+        <input type="text" inputmode="decimal" id="tare_weight" name="tare_weight"
+               value="{{ ticket.tare_weight if ticket.tare_weight is not none else '' }}">
+      </div>
+      <div class="field">
+        <label for="weigh_reason">{{ t('common.reason') }}</label>
+        <input type="text" id="weigh_reason" name="reason" maxlength="255">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">{{ t('action.update') }}</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>{{ t('weigh.correct') }}</h2>
+  <form method="post" action="{{ url_for('weighbridge.ticket_correct', ticket_id=ticket.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="field_name">{{ t('common.type') }}</label>
+        <select id="field_name" name="field_name">
+          <option value="gross_weight">{{ t('weigh.gross') }}</option>
+          <option value="tare_weight">{{ t('weigh.tare') }}</option>
+          <option value="expected_quantity">{{ t('weigh.expected') }}</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="new_value">{{ t('action.update') }}</label>
+        <input type="text" inputmode="decimal" id="new_value" name="new_value" required>
+      </div>
+    </div>
+    <div class="field">
+      <label for="correct_reason">{{ t('weigh.correction_reason') }}<span class="req">*</span></label>
+      <input type="text" id="correct_reason" name="reason" maxlength="255" required>
+    </div>
+    <div class="form-actions">
+      <button class="btn secondary" type="submit">{{ t('weigh.correct') }}</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>{{ t('weigh.correction_history') }}</h2>
+  {% if ticket.corrections %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('common.date') }}</th>
+        <th>{{ t('common.type') }}</th>
+        <th>{{ t('common.from') }}</th>
+        <th>{{ t('common.to') }}</th>
+        <th>{{ t('common.reason') }}</th>
+        <th>{{ t('audit.actor') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for correction in ticket.corrections %}
+      <tr>
+        <td>{{ correction.created_at | dt }}</td>
+        <td>{{ t('weigh.' + ('gross' if correction.field_name == 'gross_weight' else 'tare' if correction.field_name == 'tare_weight' else 'expected')) }}</td>
+        <td class="num">{{ correction.old_value or '—' }}</td>
+        <td class="num">{{ correction.new_value or '—' }}</td>
+        <td>{{ correction.reason }}</td>
+        <td>{{ correction.actor.full_name if correction.actor else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+  <p class="small muted">{{ t('weigh.correction_note') }}</p>
+</div>
+{% endblock %}

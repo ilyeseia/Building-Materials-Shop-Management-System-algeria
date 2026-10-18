@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% from "macros.html" import pagination %}
+{% block title %}{{ t('report.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('report.title') }}</h1>
+<p class="small muted">{{ t('report.period') }}: {{ period[0] | d }} — {{ period[1] | d }}</p>
+
+<div class="grid cols-3">
+  <div class="kpi">
+    <div class="label">{{ t('payment.receivables') }}</div>
+    <div class="value">{{ receivable | money }}</div>
+    <div class="small muted"><a href="{{ url_for('reports.receivables') }}">{{ t('report.receivables_aging') }}</a></div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('payment.payables') }}</div>
+    <div class="value">{{ payable | money }}</div>
+    <div class="small muted"><a href="{{ url_for('reports.payables') }}">{{ t('report.payables_aging') }}</a></div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('report.stock_valuation') }}</div>
+    <div class="value">{{ (valuation | sum(attribute='value')) | money }}</div>
+    <div class="small muted"><a href="{{ url_for('reports.stock_report') }}">{{ t('action.details') }}</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('report.title') }}</h2>
+  <div class="form-actions">
+    <a class="btn secondary" href="{{ url_for('reports.stock_report') }}">{{ t('report.stock_valuation') }}</a>
+    <a class="btn secondary" href="{{ url_for('reports.sales_report') }}">{{ t('report.sales') }}</a>
+    <a class="btn secondary" href="{{ url_for('reports.margin_report') }}">{{ t('report.gross_margin') }}</a>
+    <a class="btn secondary" href="{{ url_for('reports.receivables') }}">{{ t('report.receivables_aging') }}</a>
+    <a class="btn secondary" href="{{ url_for('reports.payables') }}">{{ t('report.payables_aging') }}</a>
+    {% if modules.weighbridge %}
+    <a class="btn secondary" href="{{ url_for('reports.weighing_report') }}">{{ t('report.weights') }}</a>
+    {% endif %}
+    {% if modules.fleet %}
+    <a class="btn secondary" href="{{ url_for('reports.fleet_report') }}">{{ t('report.transport_costs') }}</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('dashboard.low_stock') }}</h2>
+    {% if low_stock %}
+    <table class="data">
+      <thead>
+        <tr>
+          <th>{{ t('product.title') }}</th>
+          <th class="num">{{ t('product.available') }}</th>
+          <th class="num">{{ t('product.reorder_level') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in low_stock %}
+        <tr>
+          <td><a href="{{ url_for('catalog.product_detail', product_id=row.product_id) }}">{{ row.name }}</a></td>
+          <td class="num">{{ row.available | qty }}</td>
+          <td class="num">{{ row.reorder_level | qty }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>{{ t('report.stock_valuation') }}</h2>
+    <p class="small muted">{{ t('report.valuation_note') }}</p>
+    {% if valuation %}
+    <table class="data">
+      <thead>
+        <tr>
+          <th>{{ t('product.title') }}</th>
+          <th class="num">{{ t('stock.on_hand') }}</th>
+          <th class="num">{{ t('stock.avg_cost') }}</th>
+          <th class="num">{{ t('stock.value') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in valuation[:20] %}
+        <tr>
+          <td><a href="{{ url_for('catalog.product_detail', product_id=row.product_id) }}">{{ row.name }}</a></td>
+          <td class="num">{{ row.quantity | qty }}</td>
+          <td class="num">{{ row.avg_cost | money }}</td>
+          <td class="num">{{ row.value | money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ t('common.no_results') }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

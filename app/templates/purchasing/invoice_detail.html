@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv, status_badge, settlement_badge, document_lines, totals_block %}
+{% block title %}{{ invoice.number }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ t('purchase.supplier_invoice') }} — {{ invoice.number }} {{ status_badge(invoice.status) }} {{ settlement_badge(invoice.settlement_status) }}</h1>
+  <table class="data">
+    <tbody>
+      {{ kv('purchase.supplier', invoice.supplier.name if invoice.supplier else '—') }}
+      {{ kv('common.date', invoice.invoice_date | d) }}
+      {{ kv('print.due_date', invoice.due_date | d) }}
+      {{ kv('purchase.supplier_reference', invoice.supplier_reference or '—') }}
+      {% if invoice.goods_receipt_id %}{{ kv('purchase.receipt', invoice.goods_receipt_id) }}{% endif %}
+      {{ kv('common.notes', invoice.notes or '—') }}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    {% if can('payments.manage') and invoice.balance_due > 0 and invoice.status == 'posted' %}
+      <a class="btn" href="{{ url_for('finance.payment_new', direction='outbound') }}">{{ t('payment.record_payment') }}</a>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('purchasing.invoices') }}">{{ t('action.back') }}</a>
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('payment.status') }}</h2>
+    <table class="data">
+      <tbody>
+        {{ kv('common.total', invoice.total_amount | money, 'num') }}
+        {{ kv('purchase.received', invoice.paid_amount | money, 'num') }}
+        {{ kv('payment.balance', invoice.balance_due | money, 'num') }}
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>{{ t('sale.lines') }}</h2>
+    {{ document_lines(invoice.items, show_cost=True) }}
+  </div>
+</div>
+
+<div class="card">
+  {{ totals_block(invoice) }}
+</div>
+{% endblock %}

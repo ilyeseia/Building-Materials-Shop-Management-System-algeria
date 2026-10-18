@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% from "macros.html" import kv %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ product.name }}
+    {% if product.sku %}<span class="badge mono">{{ product.sku }}</span>{% endif %}
+    {% if not product.is_active %}<span class="badge inactive">{{ t('status.inactive') }}</span>{% endif %}
+  </h1>
+  <div class="form-actions">
+    {% if can('catalog.manage') %}
+      <a class="btn" href="{{ url_for('catalog.product_edit', product_id=product.id) }}">{{ t('action.edit') }}</a>
+      <a class="btn secondary" href="{{ url_for('catalog.product_conversions', product_id=product.id) }}">{{ t('conversion.title') }}</a>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('inventory.movements', product=product.id) }}">{{ t('stock.movements') }}</a>
+  </div>
+</div>
+
+<div class="grid cols-3">
+  <div class="kpi">
+    <div class="label">{{ t('product.on_hand') }}</div>
+    <div class="value">{{ total_on_hand | qty_unit(product.stock_unit_code) }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('product.available') }}</div>
+    <div class="value">{{ available | qty_unit(product.stock_unit_code) }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">{{ t('product.reorder_level') }}</div>
+    <div class="value">{{ product.reorder_level | qty_unit(product.stock_unit_code) }}</div>
+  </div>
+</div>
+
+{% if available <= product.reorder_level %}
+<div class="flash warning">{{ t('product.low_stock_only') }}</div>
+{% endif %}
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('product.title') }}</h2>
+    <table class="data">
+      <tbody>
+        {{ kv('product.category', localized_name(product.category) if product.category else '—') }}
+        {{ kv('product.brand', product.brand.name if product.brand else '—') }}
+        {{ kv('product.barcode', product.barcode or '—', 'mono') }}
+        {{ kv('product.stock_unit', product.stock_unit_code or '—') }}
+        {{ kv('product.cost_price', product.cost_price | money, 'num') }}
+        {{ kv('product.sale_price', product.sale_price | money, 'num') }}
+        {{ kv('product.wholesale_price', product.wholesale_price | money if product.wholesale_price is not none else '—', 'num') }}
+        {{ kv('product.contractor_price', product.contractor_price | money if product.contractor_price is not none else '—', 'num') }}
+        {{ kv('product.pack_size', product.pack_size | qty if product.pack_size is not none else '—') }}
+      </tbody>
+    </table>
+    {% if product.description %}<p class="small">{{ product.description }}</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>{{ t('product.spec_notes') }}</h2>
+    <table class="data">
+      <tbody>
+        {{ kv('product.bag_weight', (product.bag_weight_kg | qty_unit('kg')) if product.bag_weight_kg is not none else '—') }}
+        {{ kv('product.steel_diameter', (product.steel_diameter_mm | num(2)) if product.steel_diameter_mm is not none else '—') }}
+        {{ kv('product.steel_length', (product.steel_length_m | num(3)) if product.steel_length_m is not none else '—') }}
+        {{ kv('product.steel_grade', product.steel_grade or '—') }}
+        {{ kv('product.aggregate_grading', product.aggregate_grading or '—') }}
+        {{ kv('product.supplier', product.default_supplier.name if product.default_supplier else '—') }}
+      </tbody>
+    </table>
+    {% if steel_weight is not none %}
+      <p class="small muted">{{ t('product.steel_length') }}: {{ steel_weight | qty_unit('kg') }}</p>
+    {% endif %}
+    {% if product.spec_notes %}<p class="small">{{ product.spec_notes }}</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{ t('stock.levels') }}</h2>
+  {% if levels %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('stock.warehouse') }}</th>
+        <th class="num">{{ t('stock.on_hand') }}</th>
+        <th class="num">{{ t('stock.reserved') }}</th>
+        <th class="num">{{ t('stock.available') }}</th>
+        <th class="num">{{ t('stock.avg_cost') }}</th>
+        <th class="num">{{ t('stock.value') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for level in levels %}
+      <tr>
+        <td>{{ localized_name(level.warehouse) }}</td>
+        <td class="num">{{ level.quantity | qty_unit(product.stock_unit_code) }}</td>
+        <td class="num">{{ level.reserved | qty_unit(product.stock_unit_code) }}</td>
+        <td class="num">{{ level.available | qty_unit(product.stock_unit_code) }}</td>
+        <td class="num">{{ level.avg_cost | money }}</td>
+        <td class="num">{{ (level.quantity * level.avg_cost) | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">{{ t('stock.no_movements') }}</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>{{ t('conversion.title') }}</h2>
+  {% if conversions %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th>{{ t('conversion.from') }}</th>
+        <th>{{ t('conversion.to') }}</th>
+        <th class="num">{{ t('conversion.factor') }}</th>
+        <th>{{ t('common.type') }}</th>
+        <th>{{ t('conversion.effective_from') }}</th>
+        <th>{{ t('conversion.source') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for conversion in conversions %}
+      <tr>
+        <td>{{ conversion.from_unit.code }}</td>
+        <td>{{ conversion.to_unit.code }}</td>
+        <td class="num">{{ conversion.factor | num(6) }}</td>
+        <td>{{ t('unit.' + conversion.conversion_type) }}</td>
+        <td>{{ conversion.effective_from | d }}</td>
+        <td>{{ conversion.source or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="small muted">{{ t('conversion.density_hint') }}</p>
+  {% else %}
+  <p class="muted">{{ t('common.no_results') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

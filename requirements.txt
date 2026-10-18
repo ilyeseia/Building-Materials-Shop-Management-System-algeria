@@ -1,10 +1,47 @@
-Flask==2.3.3
-Flask-SQLAlchemy==3.0.5
+# Application runtime dependencies.
+#
+# Pinned to versions that were actually installed and exercised on this machine
+# (CPython 3.14).  The audited revision pinned Flask 2.3.3 / WTForms 3.0.1, which
+# cannot be installed on a current interpreter.
+#
+# Install:  python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
+
+# --- Web framework -----------------------------------------------------------
+Flask==3.1.3
+Werkzeug==3.1.9
+Jinja2==3.1.6
+MarkupSafe==3.0.4
+itsdangerous==2.2.0
+click==8.5.0
+blinker==1.9.0
+
+# --- Extensions --------------------------------------------------------------
+Flask-SQLAlchemy==3.1.1
 Flask-Login==0.6.3
-Flask-WTF==1.1.1
-WTForms==3.0.1
-PyMySQL==1.1.0
-cryptography==41.0.7
-reportlab==4.0.4
-python-dateutil==2.8.2
-Werkzeug==2.3.7
+Flask-WTF==1.3.0
+WTForms==3.2.2
+Flask-Migrate==4.1.0
+
+# --- Persistence -------------------------------------------------------------
+SQLAlchemy==2.1.5
+alembic==1.20.0
+# MySQL driver for the production database.
+PyMySQL==1.2.3
+# Required by PyMySQL to authenticate against MySQL 8 default auth
+# (caching_sha2_password).  Not needed for SQLite development.
+cryptography>=42.0
+
+# --- Documents and Arabic text ----------------------------------------------
+reportlab==5.0.1
+arabic-reshaper==3.0.1
+python-bidi==0.6.11
+# reportlab needs an image library for some canvas operations.
+pillow==13.0.0
+
+# --- Dates and time zones ----------------------------------------------------
+python-dateutil==2.9.0.post0
+tzdata==2026.5
+
+# --- Tests -------------------------------------------------------------------
+pytest==9.1.1
+pytest-cov==7.1.0
