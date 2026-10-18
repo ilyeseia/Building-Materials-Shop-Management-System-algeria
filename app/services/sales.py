@@ -162,9 +162,7 @@ def compute_totals(lines: list[PreparedLine], vat_rate: Decimal | None = None,
     rate = Decimal(vat_rate or 0) / HUNDRED
     subtotal = Decimal("0")
     discount = Decimal("0")
-    gross_total = Decimal("0")
     for line in lines:
-        gross_total += line.gross
         discount += line.discount
         subtotal += line.net
     if prices_include_tax and rate > 0:
@@ -173,12 +171,14 @@ def compute_totals(lines: list[PreparedLine], vat_rate: Decimal | None = None,
     else:
         tax = (subtotal * rate).quantize(MONEY_PLACES)
         net = subtotal
+    # Only columns that actually exist on the document are returned: these keys
+    # are splatted straight into the model constructors.  The pre-discount gross
+    # is a derived value (``subtotal + discount_amount``) and lives on the model.
     return {
         "subtotal": net,
         "discount_amount": discount.quantize(MONEY_PLACES),
         "tax_amount": tax,
         "total_amount": (net + tax).quantize(MONEY_PLACES),
-        "gross_total": gross_total.quantize(MONEY_PLACES),
     }
 
 
@@ -607,8 +607,7 @@ def create_invoice_from_delivery(
 
     totals = compute_totals(prepared, vat, prices_include_tax=_prices_include_tax())
     for key, value in totals.items():
-        if key != "gross_total":
-            setattr(invoice, key, value)
+        setattr(invoice, key, value)
     invoice.status = DocumentStatus.ISSUED.value
 
     if delivery.order is not None:
@@ -677,6 +676,30 @@ def direct_sale(
     )
     invoice = create_invoice_from_delivery(delivery, actor=actor)
     order.status = DocumentStatus.INVOICED.value
+
+    # The signature accepts a payment because that is how a counter sale works:
+    # the customer pays at the yard.  Recording it here (rather than asking the
+    # caller to) keeps "customer paid" true in the data instead of only in the
+    # operator's head.  Any excess over the invoice stays as an advance.
+    if paid_amount is not None and _decimal(paid_amount) > 0:
+        from app.services import payments as payments_service
+
+        tendered = _decimal(paid_amount)
+        applied = min(tendered, invoice.total_amount)
+        payments_service.record_payment(
+            direction="inbound",
+            amount=tendered,
+            customer=customer,
+            payment_date=sale_date or today_local(),
+            method=payment_method,
+            notes=notes,
+            allocations=[{
+                "document_type": "sales_invoice",
+                "document_id": invoice.id,
+                "amount": applied,
+            }],
+            actor=actor,
+        )
     return delivery, invoice
 
 
@@ -774,8 +797,7 @@ def create_credit_note(
 
     totals = compute_totals(prepared, Decimal(invoice.vat_rate or 0))
     for key, value in totals.items():
-        if key != "gross_total":
-            setattr(note, key, value)
+        setattr(note, key, value)
     note.status = DocumentStatus.ISSUED.value
     audit.record("issued", "credit_note", note.id, summary=f"{note.number}: {reason}")
     return note

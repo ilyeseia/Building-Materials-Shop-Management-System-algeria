@@ -17,6 +17,7 @@ Threat model notes (kept honest and in the docs too)
 """
 from __future__ import annotations
 
+import re
 import threading
 import time
 from collections import defaultdict, deque
@@ -180,16 +181,44 @@ def reset_rate_limits() -> None:
 # Password policy
 # ---------------------------------------------------------------------------
 
+#: Passwords that are guessed first by any credential-stuffing list.  Kept short
+#: on purpose: a blocklist is a floor, not a strength meter.
+_COMMON_PASSWORDS = frozenset({
+    "password", "passwd", "motdepasse", "mot de passe", "admin", "admin123",
+    "administrateur", "123456", "12345678", "123456789", "1234567890",
+    "qwerty", "azerty", "azerty123", "letmein", "welcome", "iloveyou",
+    "changeme", "secret", "test", "test1234", "algerie", "algeria", "dzair",
+    "espclaw", "esp-claw", "shop", "boutique",
+})
+
+_TRAILING_DECORATION = re.compile(r"[\W\d_]+$")
+
+
+def _common_core(candidate: str) -> str:
+    """``password1``/``password!`` collapse to ``password`` before comparison."""
+    return _TRAILING_DECORATION.sub("", candidate.lower())
+
+
 def password_policy_errors(password: str, *, username: str | None = None) -> list[str]:
-    """Return translation keys for each password-policy violation (empty = ok)."""
+    """Return translation keys for each password-policy violation (empty = ok).
+
+    The rules are deliberately explainable to a shopkeeper: long enough, not a
+    password everybody guesses, not the account's own name, and contains both a
+    letter and a digit.  Nothing pretends to measure "entropy".
+    """
     errors: list[str] = []
     candidate = password or ""
+    lowered = candidate.lower()
+    core = _common_core(candidate)
     if len(candidate) < PASSWORD_MIN_LENGTH:
         errors.append("auth.password_too_short")
-    if candidate and candidate.lower() in {"password", "12345678", "admin123", "motdepasse"}:
+    if core and core in _COMMON_PASSWORDS:
         errors.append("auth.password_too_weak")
-    if username and candidate.lower() in {username.lower(), f"{username.lower()}123"}:
-        errors.append("auth.password_too_weak")
+    if username and len(username) >= 4 and username.lower() in lowered:
+        # A password built on the account name is the first thing an attacker
+        # tries, whatever else it contains.
+        if "auth.password_too_weak" not in errors:
+            errors.append("auth.password_too_weak")
     if candidate and not any(char.isdigit() for char in candidate):
         errors.append("auth.password_needs_digit")
     if candidate and not any(char.isalpha() for char in candidate):

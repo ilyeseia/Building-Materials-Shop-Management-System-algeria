@@ -23,7 +23,7 @@ from wtforms import (
     SubmitField,
     TextAreaField,
 )
-from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange, Optional
+from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange, Optional, ValidationError
 
 from config import WILAYAS
 from app.models.security import ALL_ROLES
@@ -31,6 +31,22 @@ from app.models.security import ALL_ROLES
 
 def _wilaya_choices():
     return [(0, "—")] + [(code, name) for code, name in sorted(WILAYAS.items())]
+
+
+def percentage_not_a_fraction(form, field):
+    """Refuse ``0.19`` in a field whose label asks for a percentage.
+
+    Rates are stored as percentages throughout (``19`` means 19 %): the column
+    type, the ``| percent`` filter, the totals arithmetic and the 0–100 range
+    all agree on that.  Typing the fraction form is the easiest way to apply a
+    rate one hundred times too small, so it is rejected with a message instead
+    of being silently "corrected".
+    """
+    if field.data is None:
+        return
+    value = Decimal(str(field.data))
+    if Decimal("0") < value < Decimal("1"):
+        raise ValidationError("settings.vat_is_percentage")
 
 
 def _unit_choices():
@@ -383,10 +399,10 @@ class SettingsForm(BaseForm):
     currency_symbol = StringField("settings.currency_symbol", validators=[DataRequired(), Length(max=8)])
     timezone = StringField("settings.timezone", validators=[DataRequired(), Length(max=64)])
     default_language = SelectField("common.language", choices=[("ar", "العربية"), ("fr", "Français"), ("en", "English")])
-    vat_rate = DecimalField("settings.vat_rate", validators=[DataRequired(), NumberRange(min=0, max=100)], places=2)
+    vat_rate = DecimalField("settings.vat_rate", validators=[DataRequired(), NumberRange(min=0, max=100), percentage_not_a_fraction], places=2)
     prices_include_tax = BooleanField("settings.prices_include_tax")
     default_payment_terms_days = IntegerField("settings.payment_terms", validators=[Optional(), NumberRange(min=0, max=365)], default=0)
-    weigh_tolerance_percent = DecimalField("settings.weigh_tolerance", validators=[Optional(), NumberRange(min=0, max=100)], places=2, default=Decimal("2"))
+    weigh_tolerance_percent = DecimalField("settings.weigh_tolerance", validators=[Optional(), NumberRange(min=0, max=100), percentage_not_a_fraction], places=2, default=Decimal("2"))
     allow_negative_stock = BooleanField("settings.allow_negative_stock")
     enable_weighbridge = BooleanField("settings.enable_weighbridge")
     enable_fleet = BooleanField("settings.enable_fleet")

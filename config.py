@@ -124,7 +124,10 @@ class Config:
 
     # --- Accounting ------------------------------------------------
     #: Tax rates are *configuration*, never hard-coded into business logic.
-    DEFAULT_VAT_RATE = os.environ.get("DEFAULT_VAT_RATE", "0.19")
+    #: Expressed as a **percentage** (``19`` means 19 %), matching the
+    #: ``vat_rate`` form field (0–100), the ``Numeric`` "percent" columns and the
+    #: ``| percent`` template filter.  ``0.19`` here would apply 0.19 %.
+    DEFAULT_VAT_RATE = os.environ.get("DEFAULT_VAT_RATE", "19")
 
     JSON_SORT_KEYS = False
 

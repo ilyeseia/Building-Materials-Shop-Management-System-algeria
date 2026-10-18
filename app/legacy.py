@@ -37,6 +37,7 @@ Limitations (stated, not hidden)
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import inspect, text
@@ -56,7 +57,7 @@ from app.models import (
     User,
 )
 from app.models.security import Role
-from app.services import seed as seed_service, stock
+from app.services import seed as seed_service, settings as settings_service, stock
 from app.services.timeutil import today_local
 
 #: Legacy table → temporary name used during the rebuild.
@@ -68,6 +69,11 @@ DROP_ORDER: tuple[str, ...] = (
     "payments__legacy", "order_items__legacy", "orders__legacy",
     "products__legacy", "customers__legacy", "users__legacy",
 )
+
+#: Tables moved aside by the current run, i.e. ``<name>__legacy``.  Remembered
+#: rather than re-queried because schema reflection inside an open transaction is
+#: unsafe (see :func:`_legacy_present`).
+_RENAMED: set[str] = set()
 
 _UNIT_MAP: dict[str, str] = {
     "bag": "bag", "sac": "bag", "sacs": "bag",
@@ -120,6 +126,38 @@ def _inspector():
     return inspect(db.engine)
 
 
+def _as_datetime(value) -> datetime | None:
+    """Coerce a legacy timestamp to ``datetime``.
+
+    MySQL hands back ``datetime`` objects, but the same rows loaded from a SQLite
+    dump (or a CSV/JSON export) arrive as text.  Unparseable values become
+    ``None`` rather than aborting the whole migration: a missing "created at" is a
+    smaller problem than refusing to upgrade the shop's database.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime(value.year, value.month, value.day)
+    candidate = str(value).strip()
+    try:
+        return datetime.fromisoformat(candidate)
+    except ValueError:
+        pass
+    for pattern in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(candidate, pattern)
+        except ValueError:
+            continue
+    return None
+
+
+def _as_date(value, *, default=None) -> date | None:
+    parsed = _as_datetime(value)
+    return parsed.date() if parsed is not None else default
+
+
 def _columns(table: str) -> set[str]:
     try:
         return {column["name"] for column in _inspector().get_columns(table)}
@@ -149,6 +187,19 @@ def _fetch(table: str) -> list[dict]:
 def _rename(table: str) -> None:
     db.session.execute(text(f'ALTER TABLE "{table}" RENAME TO "{table}__legacy"'))
     db.session.flush()
+    _RENAMED.add(f"{table}__legacy")
+
+
+def _legacy_present(table: str) -> bool:
+    """Has ``table`` been moved aside by :func:`_rename`?
+
+    Reflection (``inspect(engine).get_table_names()``) must **not** be used here:
+    it checks out and closes a *separate* connection, and closing a connection
+    issues a rollback — which on a shared-connection database (SQLite
+    ``:memory:``) would silently discard the migration already in flight.  The
+    set of renamed tables is known, so it is remembered instead of re-queried.
+    """
+    return table in _RENAMED
 
 
 def _drop_legacy_tables() -> None:
@@ -174,11 +225,18 @@ def migrate_legacy() -> LegacyReport:
         return report
 
     # 1. Move legacy tables out of the way.
+    _RENAMED.clear()
     for table in report.tables_found:
         if table in LEGACY_TABLES:
             _rename(table)
 
     # 2. Build the new schema and seed the reference data it depends on.
+    #    The tables were just swapped out, so anything the session or the
+    #    per-request cache still holds (notably the singleton ``BusinessSettings``
+    #    row, which points at the schema that no longer exists) must be discarded
+    #    before seeding — otherwise seeding reads a row that has vanished.
+    db.session.expire_all()
+    settings_service.clear_cache()
     db.create_all()
     seed_service.seed_reference_data()
 
@@ -235,7 +293,7 @@ def _migrate_users(report: LegacyReport) -> int:
             # silently locking anyone out.  The operator should re-assign roles.
             role=Role.ADMIN,
             is_active=True,
-            created_at=row.get("created_at") or None,
+            created_at=_as_datetime(row.get("created_at")),
         )
         db.session.add(user)
         count += 1
@@ -273,7 +331,7 @@ def _migrate_products(report: LegacyReport, units: dict, default_unit) -> tuple[
             legacy_price=price,
             legacy_stock_quantity=int(row.get("stock_quantity") or 0),
             legacy_unit=row.get("unit"),
-            created_at=row.get("created_at") or None,
+            created_at=_as_datetime(row.get("created_at")),
         )
         db.session.add(product)
         db.session.flush()
@@ -305,7 +363,7 @@ def _migrate_customers(report: LegacyReport) -> tuple[dict, int]:
             phone=row.get("phone"),
             street=address,
             legacy_address=address,
-            created_at=row.get("created_at") or None,
+            created_at=_as_datetime(row.get("created_at")),
         )
         db.session.add(customer)
         db.session.flush()
@@ -322,7 +380,7 @@ def _migrate_orders(
     units: dict,
     default_unit,
 ) -> tuple[int, int]:
-    if "orders__legacy" not in _inspector().get_table_names():
+    if not _legacy_present("orders__legacy"):
         return 0, 0
     items_by_order: dict[int, list[dict]] = {}
     for item in _fetch("order_items__legacy"):
@@ -340,14 +398,14 @@ def _migrate_orders(
         order = SalesOrder(
             number=f"LEGACY-BC-{legacy_id:05d}",
             customer_id=customer_id,
-            order_date=row.get("order_date") or today_local(),
-            delivery_date=row.get("delivery_date"),
+            order_date=_as_date(row.get("order_date"), default=today_local()),
+            delivery_date=_as_date(row.get("delivery_date")),
             warehouse_id=warehouse.id if warehouse else None,
             delivery_address=row.get("delivery_address"),
             status=DocumentStatus.DELIVERED.value,
             subtotal=total,
             total_amount=total,
-            created_at=row.get("created_at") or None,
+            created_at=_as_datetime(row.get("created_at")),
             notes="Migrated from the pre-refactor database (no delivery document).",
         )
         db.session.add(order)
@@ -391,7 +449,7 @@ def _migrate_orders(
 
 
 def _migrate_payments(report: LegacyReport, customer_map: dict) -> int:
-    if "payments__legacy" not in _inspector().get_table_names():
+    if not _legacy_present("payments__legacy"):
         return 0
     order_customers: dict[int, int] = {}
     for row in _fetch("orders__legacy"):
@@ -412,14 +470,14 @@ def _migrate_payments(report: LegacyReport, customer_map: dict) -> int:
             Payment(
                 number=f"LEGACY-ENC-{legacy_id:05d}",
                 direction=PaymentDirection.INBOUND.value,
-                payment_date=row.get("payment_date") or today_local(),
+                payment_date=_as_date(row.get("payment_date"), default=today_local()),
                 amount=amount,
                 method=method,
                 reference=f"legacy order {legacy_order}" if legacy_order else None,
                 notes=(row.get("notes") or "") + "\nMigrated unallocated — re-link to its invoice.",
                 customer_id=customer_id,
                 status=DocumentStatus.POSTED.value,
-                created_at=row.get("created_at") or None,
+                created_at=_as_datetime(row.get("created_at")),
             )
         )
         count += 1

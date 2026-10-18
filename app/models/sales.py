@@ -1,4 +1,4 @@
-﻿"""Sales documents: quotation â†’ order â†’ delivery note â†’ invoice â†’ payment,
+"""Sales documents: quotation â†’ order â†’ delivery note â†’ invoice â†’ payment,
 plus returns settled by credit notes.
 
 Every money value is :class:`~decimal.Decimal`; every quantity is expressed in
@@ -43,6 +43,17 @@ class SalesDocumentMixin(TimestampMixin, ActorMixin):
     notes = db.Column(db.Text)
     cancelled_at = db.Column(db.DateTime)
     cancel_reason = db.Column(db.String(255))
+
+    @property
+    def gross_total(self) -> Decimal:
+        """Total *before* the line discount (``subtotal`` is after it).
+
+        Derived, never stored: a second stored copy could drift out of step with
+        ``subtotal`` and ``discount_amount`` after an edit.
+        """
+        return ((self.subtotal or Decimal("0")) + (self.discount_amount or Decimal("0"))).quantize(
+            Decimal("0.01")
+        )
 
 
 class LineMixin:

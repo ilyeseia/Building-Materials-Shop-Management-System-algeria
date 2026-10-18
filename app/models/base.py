@@ -106,6 +106,7 @@ class DocumentStatus(str, enum.Enum):
     PARTIALLY_DELIVERED = "partially_delivered"
     DELIVERED = "delivered"
     INVOICED = "invoiced"
+    ISSUED = "issued"
     CANCELLED = "cancelled"
     REVERSED = "reversed"
     OPEN = "open"

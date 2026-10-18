@@ -1,4 +1,4 @@
-﻿"""Purchasing: purchase order â†’ goods receipt â†’ supplier invoice â†’ payment.
+"""Purchasing: purchase order â†’ goods receipt â†’ supplier invoice â†’ payment.
 
 Receipts are the point at which stock enters the ledger.  Landed costs (transport,
 handling, other) are allocated to receipt lines in proportion to line value, so
@@ -37,6 +37,13 @@ class PurchaseDocumentMixin(TimestampMixin, ActorMixin):
     notes = db.Column(db.Text)
     cancelled_at = db.Column(db.DateTime)
     cancel_reason = db.Column(db.String(255))
+
+    @property
+    def gross_total(self) -> Decimal:
+        """Total *before* the line discount (``subtotal`` is after it)."""
+        return ((self.subtotal or Decimal("0")) + (self.discount_amount or Decimal("0"))).quantize(
+            Decimal("0.01")
+        )
 
 
 class PurchaseOrderLineMixin:

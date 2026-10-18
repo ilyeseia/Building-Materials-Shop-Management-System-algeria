@@ -154,7 +154,11 @@ def add_expense(
         raise ValidationError("val.must_be_positive")
 
     expense = TripExpense(
-        trip_id=trip.id,
+        # Assign through the relationship, not the raw FK: ``complete_trip``
+        # reads ``trip.margin`` (which loads ``trip.expenses``), and a later
+        # ``TripExpense(trip_id=…)`` would leave that loaded collection stale, so
+        # the trip would report zero expenses until the session was reloaded.
+        trip=trip,
         expense_date=expense_date or trip.trip_date or today_local(),
         expense_type=expense_type,
         amount=value,
@@ -178,7 +182,15 @@ def remove_expense(expense: TripExpense, *, reason: str = "", actor=None) -> Non
         "removed", "trip_expense", expense.id,
         summary=f"{expense.expense_type} {expense.amount} ({reason})" if reason else str(expense.amount),
     )
-    db.session.delete(expense)
+    trip = expense.trip
+    if trip is not None:
+        # Remove through the collection: the delete-orphan cascade deletes the row
+        # and keeps ``trip.expenses`` (and therefore ``trip.expenses_total``)
+        # correct within this session, without waiting for a reload.
+        trip.expenses.remove(expense)
+    else:
+        db.session.delete(expense)
+    db.session.flush()
 
 
 def assign_delivery(trip: Trip, delivery, *, actor=None) -> Trip:

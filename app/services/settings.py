@@ -6,11 +6,15 @@ and clear the request cache explicitly.
 """
 from __future__ import annotations
 
+import logging
+
 from flask import g, has_app_context
 from sqlalchemy import select
 
 from app.extensions import db
 from app.models import BusinessSettings
+
+logger = logging.getLogger(__name__)
 
 _CACHE_KEY = "_business_settings_cache"
 
@@ -20,18 +24,24 @@ def get_settings() -> BusinessSettings | None:
 
     Never raises: it is called from template filters and request hooks, including
     during first-run situations where the tables do not exist yet.
+
+    A failed read is isolated in a **savepoint**.  It must never roll back the
+    caller's transaction: this accessor is called from inside write paths (stock
+    movements, numbering, the legacy migration), and discarding that work because
+    a *read* failed would be a data-loss bug, not a graceful degradation.
     """
     if has_app_context() and _CACHE_KEY in g:
         return getattr(g, _CACHE_KEY)
     settings = None
     try:
-        settings = db.session.get(BusinessSettings, 1)
-        if settings is None:
-            settings = db.session.execute(
-                select(BusinessSettings).order_by(BusinessSettings.id).limit(1)
-            ).scalars().first()
+        with db.session.begin_nested():
+            settings = db.session.get(BusinessSettings, 1)
+            if settings is None:
+                settings = db.session.execute(
+                    select(BusinessSettings).order_by(BusinessSettings.id).limit(1)
+                ).scalars().first()
     except Exception:
-        db.session.rollback()
+        logger.debug("business settings are not readable yet", exc_info=True)
         settings = None
     if has_app_context():
         setattr(g, _CACHE_KEY, settings)

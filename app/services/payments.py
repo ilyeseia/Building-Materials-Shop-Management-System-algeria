@@ -213,7 +213,11 @@ def allocate(
         raise ValidationError("payment.exceeds_balance", amount=str(document_balance(document)))
 
     allocation = PaymentAllocation(
-        payment_id=payment.id,
+        # ``payment=payment`` (not ``payment_id=``) so the in-memory collection is
+        # updated immediately; otherwise ``payment.unallocated_amount`` stays
+        # stale inside this session and ``auto_allocate_payment`` would re-apply
+        # the whole amount to the next invoice.
+        payment=payment,
         document_type=document_type,
         document_id=document.id,
         amount=value,
