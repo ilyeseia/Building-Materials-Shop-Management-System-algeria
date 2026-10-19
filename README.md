@@ -146,7 +146,7 @@ to a default.
 ## Tests
 
 ```bash
-pytest -q                 # 194 tests
+pytest -q                 # 203 tests
 pytest -q tests/test_health.py tests/test_cli.py
 ```
 
@@ -154,7 +154,8 @@ The suite covers authentication and authorisation, catalogue and units, the stoc
 oversell protection, the full sales and purchasing chains, payments and ageing, the weighbridge
 and transport modules, reports, security headers and CSRF, the health endpoint, and the legacy
 database upgrade path. Evidence, including what is *not* covered, is in
-[`docs/TEST_REPORT.md`](docs/TEST_REPORT.md).
+[`docs/TEST_REPORT_2026-10-19.md`](docs/TEST_REPORT_2026-10-19.md).  The older
+`docs/TEST_REPORT.md` describes the previous 184-test baseline.
 
 ---
 
@@ -162,13 +163,16 @@ database upgrade path. Evidence, including what is *not* covered, is in
 
 | Environment | What was verified | Result |
 |---|---|---|
-| Ubuntu 24.04.3, Python 3.12.3 | `pytest -q` (whole suite) | **194 passed** |
+| Windows x64, Python 3.14.3 | `pytest -q` (whole suite) at revision `7211b7a` | **203 passed** |
 | Ubuntu 24.04.3, Docker 29.2.0, Compose v5.0.2 | `docker compose config --quiet`, `docker compose build` | ok |
-| MySQL 8.0.46 container | `flask db upgrade` + `flask init-db`, 50 tables, reference data seeded | ok |
+| MySQL 8.0.46 container | `flask db upgrade` + `flask init-db`, **51 tables**, 179 foreign keys | ok |
+| Disposable MySQL | Full migration from empty schema through `a1b2c3d4e5f6`, catalog pages 200, market POST 302, selling price unchanged | ok |
+| Disposable MySQL | Two-process payment allocation: one success, one `payment.exceeds_balance` refusal | ok |
 | Running stack | `GET /healthz` (200 + `database:true`), `GET /login` (200), `GET /` (302 → sign-in) | ok |
-| Running stack | Sign-in end-to-end through the real form (CSRF token, session, redirect), then 17 module pages | **ok, all 200** |
+| Running stack | Sign-in end-to-end through the real form (CSRF token, session, redirect), then 17 module pages (prior revision) | **ok, all 200** |
 | Running stack | Data survives `restart`, image rebuild and container recreation | ok |
-| Running stack | Backup + destructive restore drill | ok |
+| Running stack | Backup + isolated verification + disposable destructive restore drill | ok |
+| Production | Revision `7211b7a` deployed non-destructively; revision `a1b2c3d4e5f6`; existing rows preserved | ok |
 | Built image | Production refuses to boot without `SECRET_KEY`/`DATABASE_URL`; no secret in the image | ok |
 | tsdproxy (tailnet + Funnel) | HTTPS publication, `GET /healthz` = 200 from the tailnet and from the public internet | ok |
 
