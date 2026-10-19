@@ -61,6 +61,7 @@ def create_app(config_name: str | None = None) -> Flask:
     _register_template_helpers(app)
     _register_request_hooks(app)
     _register_error_handlers(app)
+    _register_health(app)
     _register_cli(app)
 
     return app
@@ -93,6 +94,37 @@ def _assert_production_secrets(app: Flask) -> None:
         raise RuntimeError(
             "Refusing to start in production without: " + ", ".join(missing)
             + ". Set them in the environment (see .env.example)."
+        )
+
+
+def _database_probe() -> bool:
+    """True when the application can reach its database.
+
+    Module-level on purpose so tests can monkeypatch it without a live DB.
+    """
+    from sqlalchemy import text
+
+    try:
+        db.session.execute(text("SELECT 1"))
+        return True
+    except Exception:  # pragma: no cover - exercised through monkeypatch
+        db.session.rollback()
+        return False
+
+
+def _register_health(app: Flask) -> None:
+    """Health/readiness endpoint for Docker and future orchestrators.
+
+    Deliberately minimal: no authentication, no template rendering, no version
+    or configuration disclosure.  It answers 200 only when the process responds
+    *and* the database answers ``SELECT 1``.
+    """
+
+    @app.get("/healthz")
+    def healthz():
+        ok = _database_probe()
+        return jsonify({"status": "ok" if ok else "unavailable", "database": ok}), (
+            200 if ok else 503
         )
 
 
@@ -147,7 +179,10 @@ def _register_request_hooks(app: Flask) -> None:
     def _prepare_request():
         session.permanent = True
         g.locale = get_locale()
-        if request.endpoint in {"static"}:
+        # The health endpoint must answer even when the database is down, so it
+        # skips settings loading (which reads the database) and reports the
+        # failure itself instead.
+        if request.endpoint in {"static", "healthz"}:
             return None
         g.settings = get_settings()
         # A disabled account must lose access immediately, not at next sign-in.

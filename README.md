@@ -1,302 +1,209 @@
-# 🏗️ Building Materials Shop Management System
+# Building Materials Shop Management System — Algeria
 
-A comprehensive, modern web-based management system designed specifically for building materials shops and construction supply businesses. Built with Flask, featuring a responsive UI, multi-language support, and complete business operations management.
+A management platform for building-materials traders in Algeria: catalogue, stock ledger,
+quotations, orders, deliveries, invoices, payments, purchasing, weighbridge tickets, transport
+and reporting — with an Arabic-first (RTL) interface, Algerian VAT and the DZD.
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![Flask](https://img.shields.io/badge/Flask-2.3.3-green.svg)
-![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3.2-purple.svg)
-![MySQL](https://img.shields.io/badge/MySQL-8.0+-orange.svg)
+![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)
+![Flask](https://img.shields.io/badge/Flask-3.x-green.svg)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg)
+![SQLite](https://img.shields.io/badge/SQLite-development-lightgrey.svg)
+![Docker](https://img.shields.io/badge/Docker%20Compose-ready-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-## ✨ Features
-
-### 🎯 Core Business Management
-- **Customer Management**: Complete customer database with contact information and order history
-- **Product & Inventory Management**: Track products, prices, stock levels, and low stock alerts
-- **Order Management**: Create, edit, and track orders with delivery scheduling
-- **Payment Tracking**: Comprehensive payment management with multiple payment methods
-- **Invoice Generation**: Professional PDF invoice generation for orders
-
-### 📊 Analytics & Reporting
-- **Dashboard Analytics**: Real-time business metrics and KPIs
-- **Sales Reports**: Detailed sales analysis with date range filtering
-- **Inventory Reports**: Stock level monitoring and alerts
-- **Customer Reports**: Customer performance and order history analysis
-- **Export Functionality**: CSV export for all reports
-
-### 🌐 Multi-Language Support
-- **English** (Default)
-- **हिंदी** (Hindi)
-- **اردو** (Urdu)
-- Easy language switching with persistent preferences
-
-### 🎨 Modern User Interface
-- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
-- **Dark/Light Theme**: Toggle between themes for comfortable viewing
-- **Modern UI/UX**: Clean, intuitive interface built with Bootstrap 5
-- **Real-time Updates**: Dynamic content loading without page refreshes
-- **Interactive Elements**: Modals, tooltips, and smooth animations
-
-### 🔐 Security & Authentication
-- **User Authentication**: Secure login system with password hashing
-- **Session Management**: Configurable session timeouts
-- **Data Validation**: Comprehensive input validation and sanitization
-- **SQL Injection Protection**: Parameterized queries and ORM usage
-
-## 🚀 Quick Start
-
-### Setup (Recommended)
-**⚠️ IMPORTANT**: You must install and set up MySQL BEFORE using the automated setup.
-
-**For Windows users**: 
-1. **Install MySQL** (see Database Setup section below)
-2. **Set up the database** using the provided schema (see Database Setup section below)
-3. **Double-click the `start.bat` file** to automatically:
-   - Create virtual environment
-   - Install all dependencies
-   - Launch the application
-
-**For other platforms**: Follow the manual installation steps below.
-
-### Manual Installation
-
-### Prerequisites
-- **Python 3.8 or higher** - Download from [python.org](https://python.org)
-- **MySQL 8.0 or higher** - Download from [mysql.com](https://mysql.com) or use XAMPP/WAMP
-
-### Database Setup
-**Important**: You must set up the MySQL database before running the application.
-
-#### Step 1: Install MySQL
-- **Windows**: Download MySQL Installer from [mysql.com](https://dev.mysql.com/downloads/installer/)
-- **macOS**: Use Homebrew: `brew install mysql`
-- **Linux**: `sudo apt-get install mysql-server` (Ubuntu/Debian) or `sudo yum install mysql-server` (CentOS/RHEL)
-
-#### Step 2: Start MySQL Service
-- **Windows**: MySQL service should start automatically after installation
-- **macOS**: `brew services start mysql`
-- **Linux**: `sudo systemctl start mysql`
-
-#### Step 3: Create Database and Tables
-Run the provided schema file:
-```bash
-mysql -u your_username -p < schema.sql
-```
-Or manually execute the SQL commands in `schema.sql` file.
-
-#### Step 4: Update Database Credentials
-Edit `config.py` and update the database connection:
-```python
-SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://your_username:your_password@localhost/building_materials_shop'
-```
-Replace `your_username` and `your_password` with your actual MySQL credentials.
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/sam-eer31/Building-Materials-Shop-Management-System
-   cd Building-Materials-Shop-Management-System
-   ```
-
-2. **Configure the application**
-   - Edit `config.py` to update database connection details
-   - Update the `SQLALCHEMY_DATABASE_URI` with your MySQL credentials:
-     ```python
-     SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://your_username:your_password@localhost/building_materials_shop'
-     ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Start the application**
-   ```bash
-   python app.py
-   ```
-   The application will connect to the database, create any missing tables, and automatically create a default admin user if it doesn't exist.
-
-5. **Access the application**
-   - Open your browser and go to `http://localhost:5000`
-   - Login with default credentials:
-     - **Username**: `admin`
-     - **Password**: `admin123`
-
-## 📁 Project Structure
-
-```
-Building-Materials-Shop-Management-System/
-├── app.py                 # Main Flask application
-├── config.py             # Configuration settings
-├── requirements.txt      # Python dependencies
-├── schema.sql           # Complete database schema with sample data
-├── start.bat            # Windows startup script (auto-setup)
-├── templates/           # HTML templates
-│   ├── base.html        # Base template with navigation
-│   ├── dashboard.html   # Dashboard page
-│   ├── customers.html   # Customer management
-│   ├── products.html    # Product management
-│   ├── orders.html      # Order management
-│   ├── payments.html    # Payment management
-│   ├── reports.html     # Reports and analytics
-│   └── login.html       # Login page
-└── venv/               # Virtual environment (created automatically)
-```
-
-## 🗄️ Database Schema
-
-The system uses a relational database with the following main entities:
-
-- **Users**: Authentication and user management
-- **Customers**: Customer information and contact details
-- **Products**: Product catalog with pricing and inventory
-- **Orders**: Order management with delivery scheduling
-- **Order Items**: Individual items within orders
-- **Payments**: Payment tracking and history
-
-### Sample Data
-The `schema.sql` file includes:
-- Sample products (cement, bricks, sand, steel rods, etc.)
-- Sample customers (construction companies)
-
-**Note**: The default admin user (username: `admin`, password: `admin123`) is automatically created when you first run the application.
-
-## 🎛️ Configuration
-
-### Environment Variables
-- `FLASK_ENV`: Set to `development`, `production`, or `testing`
-- `SECRET_KEY`: Secret key for session management
-- `DATABASE_URL`: MySQL database connection string
-
-### Database Configuration
-Update the database connection in `config.py`:
-```python
-SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://username:password@localhost/building_materials_shop'
-```
-
-## 🔧 API Endpoints
-
-### Authentication
-- `POST /login` - User authentication
-- `GET /logout` - User logout
-
-### Customer Management
-- `GET /customers` - View all customers
-- `GET /api/customers` - Get customer data (JSON)
-- `POST /api/customers` - Create new customer
-- `PUT /api/customers/<id>` - Update customer
-- `DELETE /api/customers/<id>` - Delete customer
-
-### Product Management
-- `GET /products` - View all products
-- `GET /api/products` - Get product data (JSON)
-- `POST /api/products` - Create new product
-- `PUT /api/products/<id>` - Update product
-- `DELETE /api/products/<id>` - Delete product
-
-### Order Management
-- `GET /orders` - View all orders
-- `GET /api/orders` - Get order data (JSON)
-- `POST /api/orders` - Create new order
-- `PUT /api/orders/<id>` - Update order
-- `DELETE /api/orders/<id>` - Delete order
-
-### Payment Management
-- `GET /payments` - View all payments
-- `GET /api/payments` - Get payment data (JSON)
-- `POST /api/payments` - Record new payment
-
-### Reports & Analytics
-- `GET /reports` - Reports dashboard
-- `GET /api/reports/sales` - Sales report data
-- `GET /api/reports/export-csv` - Export reports to CSV
-- `GET /invoice/<order_id>` - Generate PDF invoice
-
-## 🎨 Customization
-
-### Adding New Languages
-1. Add language code to `SUPPORTED_LANGUAGES` in `app.py`
-2. Add translations to the `TRANSLATIONS` dictionary
-3. Update language selection UI in templates
-
-### Customizing Themes
-Modify CSS variables in `templates/base.html`:
-```css
-:root {
-    --primary-color: #your-color;
-    --secondary-color: #your-color;
-    /* ... other variables */
-}
-```
-
-### Adding New Features
-The modular structure makes it easy to add new features:
-1. Create new database models in `app.py`
-2. Add corresponding API endpoints
-3. Create HTML templates
-4. Update navigation in `base.html`
-
-## 🚀 Deployment
-
-### Production Deployment
-1. Set `FLASK_ENV=production` in environment variables
-2. Use a production WSGI server (Gunicorn, uWSGI)
-3. Set up a reverse proxy (Nginx, Apache)
-4. Configure SSL certificates
-5. Set up database backups
-
-### Docker Deployment
-```dockerfile
-FROM python:3.9-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-EXPOSE 5000
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow PEP 8 style guidelines
-- Add comments for complex logic
-- Update documentation for new features
-- Test thoroughly before submitting
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Flask** - The web framework for Python
-- **Bootstrap** - Frontend framework for responsive design
-- **Font Awesome** - Icons and visual elements
-- **ReportLab** - PDF generation capabilities
-- **SQLAlchemy** - Database ORM and management
-
-## 📞 Support
-
-If you encounter any issues or have questions:
-
-1. Check the [Issues](https://github.com/sam-eer31/Building-Materials-Shop-Management-System/issues) page
-2. Create a new issue with detailed information
-3. Include error messages and steps to reproduce
-
-
+The application is an application-factory Flask project (`wsgi:app`) with a service layer, a
+versioned migration chain and a test suite. It is a rebuild of an earlier single-file project:
+what was wrong with the original and how it was corrected is documented in
+[`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md).
 
 ---
 
-**Made with ❤️ for building materials businesses worldwide**
+## What it manages
 
-*This project helps construction supply businesses streamline their operations, manage inventory, track orders, and grow their business efficiently.*
+| Area | Contents |
+|---|---|
+| Catalogue | Products, categories, brands, units of measure, warehouses, per-product unit conversions |
+| Inventory | Append-only stock ledger, adjustments, transfers, counts, reservations, low-stock view |
+| Sales | Quotation → order → delivery note → invoice → payment; credit notes; print/PDF documents |
+| Purchasing | Purchase order → goods receipt (landed cost) → supplier invoice → payment |
+| Weighbridge | Weight tickets (gross/tare/net), attached to receipts and deliveries; manual entry |
+| Transport | Vehicles, drivers, carriers, trips, trip expenses and cost per trip |
+| Finance | Customer and supplier payments, allocation to invoices, receivables/payables ageing |
+| Reporting | Stock, sales, purchases, margins, ageing, weighbridge and transport reports |
+| Administration | Users, roles and permissions, business settings, audit log, backups |
+
+## Algerian localisation
+
+* Arabic is the default interface language (right-to-left), with French and English available;
+  no untranslated or mixed strings.
+* DZD amounts formatted with the Algerian convention; `Decimal` everywhere, never floats.
+* Business time zone `Africa/Algiers`; wilaya and commune data for customer and supplier addresses.
+* Algerian mobile and landline validation.
+* VAT is a percentage (`19` means 19 %), used by invoices, quotations and purchase documents.
+* Every product declares an explicit stock unit, and every conversion between units is declared
+  (`m³ → kg`, `t → q`, `sacs → kg`, …) instead of being guessed.
+
+---
+
+## Quick start (Docker — recommended)
+
+```bash
+git clone https://github.com/ilyeseia/Building-Materials-Shop-Management-System-algeria.git
+cd Building-Materials-Shop-Management-System-algeria
+
+cp .env.example .env
+chmod 600 .env
+# fill in: SECRET_KEY, MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD (+ BIND_ADDRESS, HOST_PORT if needed)
+#   openssl rand -hex 32     -> SECRET_KEY
+#   openssl rand -hex 24     -> the two database passwords
+
+docker compose config --quiet          # refuses to start while a required value is empty
+docker compose up -d --build           # application + MySQL 8, both health-checked
+docker compose exec app /app/scripts/docker-init.sh   # migrations + reference data
+docker compose exec app flask create-user --username admin --role admin
+```
+
+The interface is then on `http://<BIND_ADDRESS>:<HOST_PORT>` (default `http://localhost:8080`).
+
+**Health**: `GET /healthz` answers `200 {"status":"ok","database":true}` only when the process
+*and* the database are both responding, and `503` otherwise. Docker uses it as the container
+health check.
+
+**Data**: `db-data` (MySQL), `app-instance` (generated documents) and `app-backups` (dumps) are
+named volumes. `docker compose down` keeps them, `docker compose down -v` **deletes the business
+data** — never use `-v` on an installation you care about.
+
+Full instructions, configuration reference, HTTPS/reverse-proxy setup, backup/restore drill,
+upgrade procedure and troubleshooting are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+### Publishing on a private network (optional)
+
+`docker-compose.yml` carries four `tsdproxy.*` labels that publish the application through
+[tsdproxy](https://github.com/almeidapaulopt/tsdproxy) on the host's tailnet, with HTTPS:
+
+```yaml
+labels:
+  tsdproxy.enable: "true"
+  tsdproxy.name: "Building-Materials-Shop-Management-System"
+  tsdproxy.container_port: "8000"   # the port inside the container (Gunicorn)
+  tsdproxy.funnel: "true"           # also publish on the public internet
+```
+
+`tsdproxy.container_port` is the **container** port (`8000`), not `HOST_PORT`. With
+`tsdproxy.funnel` set to `"true"` the site is reachable from the public internet through
+`https://<name>.<tailnet>.ts.net` — protected by this application's own sign-in, session
+handling and login throttle, but public nevertheless. Set it to `"false"` to keep the service
+private to the tailnet, or remove the labels to leave it unpublished.
+
+---
+
+## Running without Docker
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt        # Windows: .venv\Scripts\pip
+
+cp .env.example .env
+export $(grep -v '^#' .env | xargs)              # Windows: set the variables in the shell
+
+flask --app wsgi db upgrade                      # or: flask --app wsgi init-db  (first time)
+flask --app wsgi create-user --username admin --role admin
+
+python app.py                                    # development server, 127.0.0.1:5000
+
+gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:app       # production (Linux)
+waitress-serve --listen=127.0.0.1:8000 wsgi:app           # production (Windows)
+```
+
+Without `DATABASE_URL` the development configuration uses SQLite in `instance/`; the production
+configuration **refuses to boot** without `SECRET_KEY` and `DATABASE_URL` instead of falling back
+to a default.
+
+---
+
+## Tests
+
+```bash
+pytest -q                 # 191 tests
+pytest -q tests/test_health.py tests/test_cli.py
+```
+
+The suite covers authentication and authorisation, catalogue and units, the stock ledger and
+oversell protection, the full sales and purchasing chains, payments and ageing, the weighbridge
+and transport modules, reports, security headers and CSRF, the health endpoint, and the legacy
+database upgrade path. Evidence, including what is *not* covered, is in
+[`docs/TEST_REPORT.md`](docs/TEST_REPORT.md).
+
+---
+
+## Verified deployments
+
+| Environment | What was verified | Result |
+|---|---|---|
+| Ubuntu 24.04.3, Python 3.12.3 | `pytest -q` (whole suite) | **191 passed** |
+| Ubuntu 24.04.3, Docker 29.2.0, Compose v5.0.2 | `docker compose config --quiet`, `docker compose build` | ok |
+| MySQL 8.0.46 container | `flask db upgrade` + `flask init-db`, 50 tables, reference data seeded | ok |
+| Running stack | `GET /healthz` (200 + `database:true`), `GET /login` (200), `GET /` (302 → sign-in) | ok |
+| Running stack | Sign-in end-to-end through the real form (CSRF token, session, redirect), then 17 module pages | **ok, all 200** |
+| Running stack | Data survives `restart`, image rebuild and container recreation | ok |
+| Running stack | Backup + destructive restore drill | ok |
+| Built image | Production refuses to boot without `SECRET_KEY`/`DATABASE_URL`; no secret in the image | ok |
+| tsdproxy (tailnet + Funnel) | HTTPS publication, `GET /healthz` = 200 from the tailnet and from the public internet | ok |
+
+Additions and corrections since the initial rebuild are recorded in
+[`CHANGELOG.md`](CHANGELOG.md).
+
+---
+
+## Project structure
+
+```
+app/
+  __init__.py          application factory, request hooks, security headers, /healthz
+  models/              SQLAlchemy models (catalogue, stock, sales, purchasing, finance, …)
+  services/            business rules (stock ledger, money, UOM conversion, numbering, reports)
+  blueprints/          HTTP layer, one module per functional area, authorisation per route
+  templates/           Jinja templates (RTL-aware, print layouts, no CDN assets)
+  translations/        Arabic, French and English catalogues
+  static/              application CSS and JavaScript
+migrations/            Alembic chain (versioned, reversible, preserves user data)
+scripts/               entrypoint.sh, docker-init.sh, backup.sh, restore.sh
+tests/                 pytest suite and fixtures
+docs/                  audit, deployment guide, test report
+config.py              environment-driven configuration (development/testing/production)
+wsgi.py                WSGI entry point (`wsgi:app`)     app.py: development entry point
+docker-compose.yml     application + MySQL, health checks, volumes, network, tsdproxy labels
+Dockerfile             multi-stage build, non-root runtime, Gunicorn
+```
+
+---
+
+## Security
+
+Server-side authorisation on every route, CSRF protection on all state-changing requests,
+login throttling, secure cookie options, security headers (CSP without any CDN, `X-Frame-Options`,
+`Referrer-Policy`, HSTS when the request is secure), an audit log for sign-in and data changes,
+no committed secrets (`.env` is git-ignored and never copied into the image), production errors
+that never leak tracebacks, non-root containers with dropped capabilities, and a database that
+publishes no port. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#11-verification-performed) for the
+checks that were actually executed.
+
+---
+
+## Known limitations
+
+* Weighing-device integration is manual: the adapter boundary exists, but no serial/TCP scale
+  driver is implemented.
+* Single-host Docker deployment; no Kubernetes manifests and no managed-database variant.
+* The Compose file pins `mysql:8.0`; MySQL 8.4+, MariaDB and PostgreSQL are not tested.
+* `scripts/restore.sh` restores from a logical dump — it is not point-in-time recovery.
+* The MySQL client tools inside the image are MariaDB's and connect with TLS disabled inside the
+  private Docker network (the application driver connects the same way).
+
+---
+
+## License and credits
+
+MIT — see [`LICENSE`](LICENSE). The original application this project was rebuilt from is by
+[sam-eer31](https://github.com/sam-eer31); the Algerian platform, the data model, the stock
+ledger, the security work, the Docker deployment and the test suite are this project's.

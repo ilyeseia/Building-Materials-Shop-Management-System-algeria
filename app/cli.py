@@ -70,8 +70,11 @@ def register_cli(app) -> None:
         if errors:
             from app.i18n import translate
 
+            # There is no request context in a CLI command, so the language is
+            # explicit (the keys are also the operator's diagnostics).
             raise click.ClickException(
-                "Password rejected: " + "; ".join(translate(key) for key in errors)
+                "Password rejected: "
+                + "; ".join(translate(key, language="en") for key in errors)
             )
         if db.session.execute(db.select(User).filter_by(username=username)).scalars().first():
             raise click.ClickException(f"User '{username}' already exists.")

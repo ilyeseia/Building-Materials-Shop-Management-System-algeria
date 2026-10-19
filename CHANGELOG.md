@@ -72,6 +72,21 @@ existing deployment is not surprised, but replaces the internals.
   validator messages are mapped to catalogue keys.
 * Support files: `.gitignore`, `.env.example`, `requirements.txt` (modern pins),
   rewritten `start.bat` (no fabricated default credentials).
+* **Docker deployment** (`Dockerfile`, `docker-compose.yml`, `.dockerignore`,
+  `.env.example`, `scripts/entrypoint.sh`, `scripts/docker-init.sh`,
+  `scripts/backup.sh`, `scripts/restore.sh`, `docs/DEPLOYMENT.md`): multi-stage
+  build on `python:3.13-slim`, non-root runtime (UID/GID 10001) whose code tree
+  is root-owned and read-only, Gunicorn instead of the development server, a
+  container `HEALTHCHECK` on `/healthz`, MySQL 8 on an internal-only network
+  (the database publishes no port), named volumes for all business data,
+  required secrets (`${VAR:?}`), resource limits, `cap_drop: ALL` and
+  `no-new-privileges`, and four optional `tsdproxy.*` labels that publish the
+  application over a tailnet / Tailscale Funnel with HTTPS.
+* **`GET /healthz`**: `200` only when the process *and* the database answer,
+  `503` otherwise; used as the Docker health check (`app/__init__.py`,
+  `tests/test_health.py`).
+* **`tests/test_cli.py`**: creating a user through the CLI, including the
+  refused-password path.
 
 ### Changed
 
@@ -114,10 +129,14 @@ existing deployment is not surprised, but replaces the internals.
   `SalesInvoice.return_document_id`, `DeliveryNote.weighing_ticket_id`,
   `GoodsReceipt.weighing_ticket_id`); the link is derivable from the child row.
 
+### Fixed
+
+* `flask create-user` and `flask reset-password` crashed with
+  `RuntimeError: Working outside of request context` when a password was
+  refused: the policy message was translated with the request-bound locale.
+  CLI output is now translated with an explicit language, so the operator sees
+  `Password rejected: <reason>` and a non-zero exit code — never a traceback.
+
 ### Not done yet
 
-* Automated test suite and `docs/TEST_REPORT.md`.
-* `migrations/` (Alembic) still to be generated and verified.
-* Remaining documentation set and the feature matrix / known-limitations
-  register.
 * Batch/lot tracking, real scale integration, and accounting export.

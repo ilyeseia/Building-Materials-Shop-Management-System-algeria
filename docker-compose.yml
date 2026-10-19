@@ -1,0 +1,150 @@
+# =============================================================================
+# Building Materials Shop Management System - Docker Compose
+# =============================================================================
+# Services: app (Gunicorn + Flask) and db (MySQL 8).  The database is never
+# published to the host; only the application port is.
+#
+# First run:
+#   cp .env.example .env      # then fill in the secrets
+#   docker compose up -d --build
+#   docker compose exec app /app/scripts/docker-init.sh
+#
+# Documentation: README.md (Docker deployment)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Application
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UID: 10001
+        GID: 10001
+    env_file:
+      - .env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_NAME: ${APP_NAME:-Building Materials Management}
+      # Built from the MYSQL_* values so credentials live in exactly one place.
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE}?charset=utf8mb4
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
+      TIMEZONE: ${TIMEZONE:-Africa/Algiers}
+      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-ar}
+      CURRENCY: ${CURRENCY:-DZD}
+      CURRENCY_SYMBOL: ${CURRENCY_SYMBOL:-DA}
+      DEFAULT_VAT_RATE: ${DEFAULT_VAT_RATE:-19}
+      FEATURE_WEIGHBRIDGE: ${FEATURE_WEIGHBRIDGE:-1}
+      FEATURE_FLEET: ${FEATURE_FLEET:-1}
+      FEATURE_ACCOUNTING: ${FEATURE_ACCOUNTING:-0}
+      # 0 = plain HTTP (works out of the box).  Set to 1 behind HTTPS.
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-0}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_LOG_LEVEL: ${GUNICORN_LOG_LEVEL:-info}
+    volumes:
+      # Generated documents, Python instance data, ad-hoc exports.
+      - app-instance:/app/instance
+      # Dumps written by scripts/backup.sh.
+      - app-backups:/app/backups
+    # -------------------------------------------------------------------------
+    # Optional: publish this service on the tailnet through tsdproxy.
+    # tsdproxy reads these labels from the container; nothing else is needed.
+    #
+    #   tsdproxy.container_port  the port INSIDE this container.  Gunicorn
+    #                            listens on 8000 here; HOST_PORT (8090) exists
+    #                            only on the host and is invisible to tsdproxy.
+    #   tsdproxy.funnel          "true" makes the service reachable from the
+    #                            public internet (Tailscale Funnel), protected
+    #                            only by this application's own sign-in and
+    #                            rate limiting.  Use "false" to keep it private
+    #                            to the tailnet, or delete the four labels to
+    #                            leave the service unpublished.  Funnel requires
+    #                            HTTPS on 443/8443/10000, which tsdproxy handles.
+    # -------------------------------------------------------------------------
+    labels:
+      tsdproxy.enable: "true"
+      tsdproxy.name: "Building-Materials-Shop-Management-System"
+      tsdproxy.container_port: "8000"
+      tsdproxy.funnel: "true"
+    ports:
+      # BIND_ADDRESS=127.0.0.1 keeps the service private to this machine.
+      - "${BIND_ADDRESS:-127.0.0.1}:${HOST_PORT:-8080}:8000"
+    networks:
+      - app-network
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # Database (internal network only - no published port)
+  # ---------------------------------------------------------------------------
+  db:
+    image: mysql:8.0
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE must be set in .env}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER must be set in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - app-network
+    restart: unless-stopped
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-connections=200
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+# ---------------------------------------------------------------------------
+# Persistent data - deleting these volumes deletes business records.
+# ---------------------------------------------------------------------------
+volumes:
+  db-data:
+  app-instance:
+  app-backups:
+
+# ---------------------------------------------------------------------------
+# Private network for the two services
+# ---------------------------------------------------------------------------
+networks:
+  app-network:
+    name: building-materials-network

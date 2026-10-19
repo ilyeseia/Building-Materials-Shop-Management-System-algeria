@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# Docker build-context exclusions.
+# Patterns are rooted at the context; "**" makes one recursive.
+# Only the paths COPYed by the Dockerfile matter, but a small context keeps
+# builds fast and guarantees no local secret ever reaches the daemon.
+# ---------------------------------------------------------------------------
+
+# --- Version control --------------------------------------------------------
+.git
+.gitignore
+.gitattributes
+
+# --- Python bytecode / caches (recursive) -----------------------------------
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.tox/
+
+# --- Virtual environments ---------------------------------------------------
+**/.venv/
+**/venv/
+**/env/
+
+# --- Secrets and local configuration ---------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Local runtime data (volumes are mounted at run time instead) -----------
+/instance/
+/backups/
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# --- Logs -------------------------------------------------------------------
+**/*.log
+/logs/
+
+# --- Editors and OS noise ---------------------------------------------------
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Tests and developer scratch files --------------------------------------
+/tests/
+/_*.py
+/_*.txt
+/_*.out
+
+# --- Sources the image does not contain -------------------------------------
+/docs/
+/templates/
+/schema.sql
