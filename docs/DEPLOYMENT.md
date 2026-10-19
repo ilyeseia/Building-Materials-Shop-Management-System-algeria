@@ -348,7 +348,7 @@ the configuration on paper.
 | `flask init-db` (create + seed, never drops) | ok — `{'units': 13, 'categories': 7, 'warehouses': 1, 'brands': 0}`; a second run creates nothing |
 | Schema size | 49 application tables + `alembic_version` = 50 objects in `information_schema` |
 | Sign-in end to end through the real form: CSRF token from the page, wrong password → `401`, correct password → `302`, then 17 module pages | ok — all 17 pages return `200` |
-| Application suite, `pytest -q` (Ubuntu 24.04.3, Python 3.12.3) | **194 passed in ~55 s** |
+| Application suite, `pytest -q` (Ubuntu 24.04.3, Python 3.12.3) | **194 passed in 53.3 s** |
 | Data survives `docker compose restart app` | ok (user and product counts unchanged) |
 | Data survives an image rebuild + container recreation | ok |
 | Data survives `docker compose down` + `up -d` (volumes kept) | ok |
