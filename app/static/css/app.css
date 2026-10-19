@@ -1590,6 +1590,40 @@ select[disabled] {
 .req { color: var(--danger); margin-inline-start: 2px; }
 .muted { color: var(--muted); }
 .small { font-size: 0.82rem; }
+
+/* AI workspace ------------------------------------------------------------ */
+.answer-body {
+  white-space: pre-wrap;
+  line-height: 1.75;
+  margin: 0;
+  unicode-bidi: plaintext;
+}
+
+.tool-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tool-list li {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  background: var(--surface-2);
+}
+
+.ai-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 10px;
+}
 .mono { font-family: var(--font-mono); }
 .text-end { text-align: end; }
 .nowrap { white-space: nowrap; }

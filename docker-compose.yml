@@ -23,6 +23,9 @@ services:
       args:
         UID: 10001
         GID: 10001
+        APP_VERSION: ${APP_VERSION:-1.1.0}
+        BUILD_COMMIT: ${BUILD_COMMIT:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
     env_file:
       - .env
     environment:
@@ -39,6 +42,23 @@ services:
       FEATURE_WEIGHBRIDGE: ${FEATURE_WEIGHBRIDGE:-1}
       FEATURE_FLEET: ${FEATURE_FLEET:-1}
       FEATURE_ACCOUNTING: ${FEATURE_ACCOUNTING:-0}
+      FEATURE_AI: ${FEATURE_AI:-1}
+      APP_VERSION: ${APP_VERSION:-1.1.0}
+      BUILD_COMMIT: ${BUILD_COMMIT:-unknown}
+      BUILD_DATE: ${BUILD_DATE:-unknown}
+      BACKUP_DIR: /app/backups
+      BACKUP_STALE_HOURS: ${BACKUP_STALE_HOURS:-48}
+      LICENSE_FILE: /app/instance/license.json
+      LICENSE_SECRET: ${LICENSE_SECRET:-}
+      # AI workspace: "local" needs no network or key.  Set AI_PROVIDER=openai
+      # (or another OpenAI-compatible gateway) and AI_API_KEY to use an external
+      # model; a provider outage falls back to the local assistant.
+      AI_PROVIDER: ${AI_PROVIDER:-local}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-20}
+      AI_MAX_TOOL_ROUNDS: ${AI_MAX_TOOL_ROUNDS:-3}
       # 0 = plain HTTP (works out of the box).  Set to 1 behind HTTPS.
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-0}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}

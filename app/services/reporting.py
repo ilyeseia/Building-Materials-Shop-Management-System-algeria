@@ -216,8 +216,15 @@ def receivable_total(*, as_of: date | None = None) -> Decimal:
         )
     ).scalars().all()
     credited = _credited_by_invoice()
+    paid = _paid_by_document("sales_invoice")
     return sum(
-        (_invoice_balance(inv, credited.get(inv.id, ZERO)) for inv in invoices), ZERO
+        (
+            _invoice_balance(
+                inv, credited.get(inv.id, ZERO), paid.get(inv.id, ZERO)
+            )
+            for inv in invoices
+        ),
+        ZERO,
     ).quantize(MONEY_PLACES)
 
 
@@ -228,7 +235,10 @@ def payable_total(*, as_of: date | None = None) -> Decimal:
             *_active_invoice_filter(SupplierInvoice, SupplierInvoice.invoice_date, None, as_of)
         )
     ).scalars().all()
-    return sum((Decimal(inv.balance_due or 0) for inv in invoices), ZERO).quantize(MONEY_PLACES)
+    paid = _paid_by_document("supplier_invoice")
+    return sum(
+        (_supplier_invoice_balance(inv, paid.get(inv.id, ZERO)) for inv in invoices), ZERO
+    ).quantize(MONEY_PLACES)
 
 
 def _credited_by_invoice() -> dict[int, Decimal]:
@@ -243,8 +253,52 @@ def _credited_by_invoice() -> dict[int, Decimal]:
     return {int(invoice_id): Decimal(str(total or 0)) for invoice_id, total in rows}
 
 
-def _invoice_balance(invoice: SalesInvoice, credited: Decimal) -> Decimal:
-    return _money(Decimal(invoice.total_amount or 0) - invoice.paid_amount - credited)
+def _invoice_balance(
+    invoice: SalesInvoice, credited: Decimal, paid: Decimal
+) -> Decimal:
+    """Balance from pre-fetched maps.
+
+    ``invoice.paid_amount`` issues one query per invoice; calling it inside a
+    loop over thousands of invoices was a measured N+1 (~1,000 statements for
+    the dashboard and receivables page).  Callers aggregate payments once with
+    :func:`_paid_by_document` instead.
+    """
+    return _money(Decimal(invoice.total_amount or 0) - paid - credited)
+
+
+def _supplier_invoice_balance(
+    invoice: SupplierInvoice, paid: Decimal
+) -> Decimal:
+    return _money(Decimal(invoice.total_amount or 0) - paid)
+
+
+def invoice_settlements(invoices: list[SalesInvoice]) -> dict[int, dict]:
+    """Batch balances and settlement statuses for a list page.
+
+    Returns ``{invoice_id: {"balance": Decimal, "status": str}}`` using one
+    allocation query and one credit-note query for the whole page instead of two
+    queries per row.
+    """
+    credited = _credited_by_invoice()
+    paid = _paid_by_document("sales_invoice")
+    result: dict[int, dict] = {}
+    for invoice in invoices:
+        invoice_paid = paid.get(invoice.id, ZERO)
+        invoice_credited = credited.get(invoice.id, ZERO)
+        balance = _invoice_balance(invoice, invoice_credited, invoice_paid)
+        if invoice.status in {
+            DocumentStatus.DRAFT.value,
+            DocumentStatus.CANCELLED.value,
+        }:
+            status = invoice.status
+        elif balance <= 0:
+            status = "paid"
+        elif invoice_paid > 0 or invoice_credited > 0:
+            status = "partial"
+        else:
+            status = "unpaid"
+        result[invoice.id] = {"balance": balance, "status": status}
+    return result
 
 
 def _bucket_key(days_overdue: int) -> str:
@@ -269,12 +323,15 @@ def receivables_aging(*, as_of: date | None = None, customer_id: int | None = No
         query = query.where(SalesInvoice.customer_id == customer_id)
     invoices = db.session.execute(query.order_by(SalesInvoice.invoice_date)).scalars().all()
     credited = _credited_by_invoice()
+    paid = _paid_by_document("sales_invoice")
 
     buckets = {key: ZERO for key, _label, _lo, _hi in AGING_BUCKETS}
     rows: list[dict] = []
     by_customer: dict[int, Decimal] = {}
     for invoice in invoices:
-        balance = _invoice_balance(invoice, credited.get(invoice.id, ZERO))
+        balance = _invoice_balance(
+            invoice, credited.get(invoice.id, ZERO), paid.get(invoice.id, ZERO)
+        )
         if balance <= 0:
             continue
         due = invoice.due_date or invoice.invoice_date
@@ -319,12 +376,13 @@ def payables_aging(*, as_of: date | None = None, supplier_id: int | None = None)
     if supplier_id:
         query = query.where(SupplierInvoice.supplier_id == supplier_id)
     invoices = db.session.execute(query.order_by(SupplierInvoice.invoice_date)).scalars().all()
+    paid = _paid_by_document("supplier_invoice")
 
     buckets = {key: ZERO for key, _label, _lo, _hi in AGING_BUCKETS}
     rows: list[dict] = []
     by_supplier: dict[int, Decimal] = {}
     for invoice in invoices:
-        balance = _money(invoice.balance_due)
+        balance = _supplier_invoice_balance(invoice, paid.get(invoice.id, ZERO))
         if balance <= 0:
             continue
         due = invoice.due_date or invoice.invoice_date

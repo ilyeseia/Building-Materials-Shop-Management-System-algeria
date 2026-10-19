@@ -11,6 +11,7 @@ from flask import Flask
 
 def register_blueprints(app: Flask) -> None:
     from app.blueprints import (
+        ai,
         audit,
         auth,
         catalog,
@@ -28,7 +29,7 @@ def register_blueprints(app: Flask) -> None:
     )
 
     for module in (
-        auth, dashboard, parties, catalog, inventory, sales, purchasing,
+        auth, dashboard, ai, parties, catalog, inventory, sales, purchasing,
         finance, weighbridge, fleet, reports, settings_bp, users, audit,
     ):
         app.register_blueprint(module.bp)

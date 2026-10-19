@@ -4,6 +4,9 @@
 {% block content %}
 <h1>{{ t('settings.title') }}</h1>
 <p class="small muted">{{ t('settings.regulatory_note') }}</p>
+{% if can('settings.manage') %}
+<p><a class="btn secondary small" href="{{ url_for('settings.system') }}">{{ t('system.open') }}</a></p>
+{% endif %}
 
 {% if can('settings.manage') %}
 {{ render_form(form, cancel_url=url_for('settings.index')) }}
@@ -31,6 +34,7 @@
         <tr><th>{{ t('nav.weighbridge') }}</th><td>{{ t('common.yes') if settings.enable_weighbridge else t('common.no') }}</td></tr>
         <tr><th>{{ t('nav.fleet') }}</th><td>{{ t('common.yes') if settings.enable_fleet else t('common.no') }}</td></tr>
         <tr><th>{{ t('settings.enable_accounting') }}</th><td>{{ t('common.yes') if settings.enable_accounting else t('common.no') }}</td></tr>
+        <tr><th>{{ t('settings.enable_ai') }}</th><td>{{ t('common.yes') if settings.enable_ai else t('common.no') }}</td></tr>
         <tr><th>{{ t('settings.allow_negative_stock') }}</th><td>{{ t('common.yes') if settings.allow_negative_stock else t('common.no') }}</td></tr>
       </tbody>
     </table>

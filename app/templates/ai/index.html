@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "macros.html" import field, empty_state %}
+{% block title %}{{ t('ai.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('ai.title') }}</h1>
+<p class="small muted">{{ t('ai.subtitle') }}</p>
+
+<div class="card">
+  <div class="ai-meta">
+    <span class="badge info">{{ t('ai.read_only') }}</span>
+    <span class="badge mono">{{ provider.label }}</span>
+    {% if provider.model %}<span class="badge mono">{{ provider.model }}</span>{% endif %}
+    {% if provider.provider != 'local' and not provider.configured %}
+      <span class="badge warning">{{ t('ai.provider_not_configured') }}</span>
+    {% endif %}
+  </div>
+  <form method="post" action="{{ url_for('ai.ask') }}">
+    {{ form.hidden_tag() }}
+    {{ field(form.question, rows=4) }}
+    <div class="form-actions">
+      <button class="btn" type="submit">{{ t('ai.ask') }}</button>
+    </div>
+  </form>
+  {% if tools %}
+    <p class="small muted">{{ t('ai.tools') }}</p>
+    <ul class="tool-list">
+      {% for tool in tools %}
+        <li title="{{ tool.permission }}">{{ tool.description }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {{ empty_state(t('ai.no_tools')) }}
+  {% endif %}
+</div>
+
+{% if latest %}
+<div class="card">
+  <div class="card-head">
+    <div>
+      <h2>{{ t('ai.answer') }}</h2>
+      <p class="small muted">
+        {{ latest.created_at | dt }} ·
+        {{ t('ai.status.' + latest.status) }} ·
+        {{ latest.provider }}{% if latest.model %} / {{ latest.model }}{% endif %}
+      </p>
+    </div>
+  </div>
+  <p class="answer-body">{{ latest.answer }}</p>
+  <p class="small muted">{{ latest.question }}</p>
+  {% if latest.tool_calls and latest.tool_calls != '[]' %}
+    <details>
+      <summary>{{ t('ai.tool_calls') }}</summary>
+      <pre class="mono small">{{ latest.tool_calls }}</pre>
+    </details>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>{{ t('ai.history') }}</h2>
+  {% if history %}
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>{{ t('common.date') }}</th>
+            <th>{{ t('ai.question') }}</th>
+            <th>{{ t('common.status') }}</th>
+            <th>{{ t('ai.provider') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in history %}
+          <tr>
+            <td>{{ row.created_at | dt }}</td>
+            <td>{{ row.question }}</td>
+            <td><span class="badge {{ 'confirmed' if row.status == 'ok' else ('warning' if row.status == 'unavailable' else 'failed') }}">{{ t('ai.status.' + row.status) }}</span></td>
+            <td class="mono small">{{ row.provider }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {{ empty_state(t('ai.no_history')) }}
+  {% endif %}
+</div>
+{% endblock %}

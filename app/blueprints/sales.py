@@ -387,14 +387,17 @@ def invoices():
     page, per_page = page_args()
     query = select(SalesInvoice).order_by(SalesInvoice.invoice_date.desc(), SalesInvoice.id.desc())
     result = reporting.paginate(query, page, per_page)
+    settlements = reporting.invoice_settlements(result["items"])
     rows = [
         {
             "number": invoice.number,
             "date": invoice.invoice_date.strftime("%d/%m/%Y"),
             "customer": invoice.customer.name if invoice.customer else "",
             "total": format_money(invoice.total_amount),
-            "balance": format_money(invoice.balance_due),
-            "settlement": translate(f"settlement.{invoice.settlement_status}"),
+            "balance": format_money(settlements[invoice.id]["balance"]),
+            "settlement": translate(
+                f"settlement.{settlements[invoice.id]['status']}"
+            ),
             "_url": url_for("sales.invoice_detail", invoice_id=invoice.id),
         }
         for invoice in result["items"]

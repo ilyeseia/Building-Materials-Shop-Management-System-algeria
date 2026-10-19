@@ -10,6 +10,11 @@ instance/
 *.sqlite
 *.sqlite3
 instance/backups/
+backups/
+offsite-staging/
+backups-cron.log
+backup.env
+*.log
 
 # --- Python -----------------------------------------------------------------
 __pycache__/

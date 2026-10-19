@@ -26,6 +26,13 @@ from app.models.base import (  # noqa: F401
     ValuationMethod,
     WeighingDirection,
 )
+from app.models.ai import (  # noqa: F401
+    AIInteraction,
+    AI_STATUS_ERROR,
+    AI_STATUS_OK,
+    AI_STATUS_REFUSED,
+    AI_STATUS_UNAVAILABLE,
+)
 from app.models.catalog import (  # noqa: F401
     Brand,
     Category,
@@ -98,4 +105,6 @@ __all__ = [
     "WeighbridgeDevice", "WeighingTicket", "WeighingCorrection",
     "Vehicle", "Driver", "Carrier", "Trip", "TripExpense",
     "BusinessSettings", "NumberSequence", "AuditEvent",
+    "AIInteraction",
+    "AI_STATUS_OK", "AI_STATUS_UNAVAILABLE", "AI_STATUS_ERROR", "AI_STATUS_REFUSED",
 ]

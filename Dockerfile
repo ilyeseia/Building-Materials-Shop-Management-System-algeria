@@ -34,12 +34,26 @@ RUN pip install --upgrade pip \
 # ---- Stage 2: runtime --------------------------------------------------------
 FROM python:3.13-slim AS runtime
 
+# Release identity.  Pass these from CI/release.sh so the status page can state
+# exactly which commit is running.  They are not secrets.
+ARG APP_VERSION=1.1.0
+ARG BUILD_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="Building Materials Shop Management System" \
+      org.opencontainers.image.version="${APP_VERSION}" \
+      org.opencontainers.image.revision="${BUILD_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_DATE}"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     PATH="/opt/venv/bin:$PATH" \
     TZ=Africa/Algiers \
     APP_ENV=production \
+    APP_VERSION="${APP_VERSION}" \
+    BUILD_COMMIT="${BUILD_COMMIT}" \
+    BUILD_DATE="${BUILD_DATE}" \
     FLASK_APP=wsgi:app
 
 # curl                  - container health check (GET /healthz)
@@ -66,6 +80,7 @@ COPY --from=builder /opt/venv /opt/venv
 # The code stays owned by root: the runtime user may execute it but cannot
 # modify it.  Only the two paths below are writable by the application.
 COPY config.py wsgi.py requirements.txt ./
+COPY VERSION ./
 COPY app/ ./app/
 COPY migrations/ ./migrations/
 COPY scripts/ ./scripts/

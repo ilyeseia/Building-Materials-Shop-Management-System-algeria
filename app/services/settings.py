@@ -70,6 +70,7 @@ def ensure_settings() -> BusinessSettings:
         enable_weighbridge=Config.FEATURE_WEIGHBRIDGE,
         enable_fleet=Config.FEATURE_FLEET,
         enable_accounting=Config.FEATURE_ACCOUNTING,
+        enable_ai=Config.FEATURE_AI,
     )
     db.session.add(settings)
     db.session.flush()
@@ -86,7 +87,7 @@ def update_settings(changes: dict) -> BusinessSettings:
         "bank_details", "invoice_footer", "currency", "currency_symbol",
         "timezone", "default_language", "decimal_separator",
         "thousands_separator", "vat_rate", "prices_include_tax",
-        "valuation_method", "enable_weighbridge", "enable_fleet",
+        "valuation_method", "enable_weighbridge", "enable_fleet", "enable_ai",
         "enable_accounting", "default_warehouse_id", "weigh_tolerance_percent",
         "default_payment_terms_days", "allow_negative_stock",
     }

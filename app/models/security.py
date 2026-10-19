@@ -48,7 +48,11 @@ _PAIRS = (
     "weigh", "fleet", "payments", "settings", "users",
 )
 
-_ALL_VIEWS = {f"{name}.view" for name in _PAIRS} | {"dashboard.view", "reports.view", "audit.view"}
+# The AI workspace is read-only, so there is deliberately no ``ai.manage``
+# permission.  Granting one would suggest the assistant can change data.
+_ALL_VIEWS = {f"{name}.view" for name in _PAIRS} | {
+    "dashboard.view", "reports.view", "audit.view", "ai.view",
+}
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     Role.ADMIN: {"*"},
@@ -60,17 +64,18 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "dashboard.view", "sales.view", "sales.manage",
         "customers.view", "customers.manage",
         "catalog.view", "inventory.view", "reports.view", "weigh.view",
+        "ai.view",
     },
     Role.CASHIER: {
         "dashboard.view", "sales.view", "payments.view", "payments.manage",
-        "customers.view", "reports.view",
+        "customers.view", "reports.view", "ai.view",
     },
     Role.STOCK: {
         "dashboard.view", "inventory.view", "inventory.manage",
         "catalog.view", "catalog.manage",
         "purchasing.view", "purchasing.manage",
         "suppliers.view", "suppliers.manage",
-        "reports.view", "weigh.view",
+        "reports.view", "weigh.view", "ai.view",
     },
     Role.WEIGHBRIDGE: {
         "dashboard.view", "weigh.view", "weigh.manage",

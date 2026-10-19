@@ -1,5 +1,9 @@
 # Phase A - Verified Production Audit and Phase B/D Delivery
 
+> **Historical audit.** The evidence below remains valid for revision `7211b7a`.
+> The release-level status after the AI, commercial and performance work is
+> tracked in `docs/RELEASE_STATUS_2026-10-19.md`.
+
 **Audit date:** 2026-10-19  
 **Deployed revision:** `7211b7a`  
 **Production URL:** `https://building-materials-shop-management-system.tail7d68dd.ts.net/`  

@@ -32,6 +32,15 @@ def _int_env(name: str, default: int) -> int:
         return default
 
 
+def _read_version() -> str:
+    """Release version from ``VERSION``, with a safe source-checkout fallback."""
+    try:
+        value = (BASE_DIR / "VERSION").read_text(encoding="utf-8").strip()
+        return value or "0.0.0-dev"
+    except OSError:
+        return "0.0.0-dev"
+
+
 # ---------------------------------------------------------------------------
 # Algerian reference data (public administrative data, not regulatory advice)
 # ---------------------------------------------------------------------------
@@ -64,6 +73,21 @@ class Config:
     # --- Core ---------------------------------------------------------
     APP_NAME = os.environ.get("APP_NAME", "Building Materials Management")
     ENVIRONMENT = os.environ.get("APP_ENV", "development")
+    #: Release identity.  The release script and the Docker build pass these in;
+    #: the defaults keep a source checkout usable without any build pipeline.
+    APP_VERSION = os.environ.get("APP_VERSION") or _read_version()
+    BUILD_COMMIT = os.environ.get("BUILD_COMMIT", "")
+    BUILD_DATE = os.environ.get("BUILD_DATE", "")
+    #: Informational licensing.  A missing, expired or malformed license never
+    #: disables a feature or blocks sign-in; see docs/COMMERCIAL.md.
+    LICENSE_FILE = os.environ.get(
+        "LICENSE_FILE", str(INSTANCE_DIR / "license.json")
+    )
+    LICENSE_SECRET = os.environ.get("LICENSE_SECRET")
+    #: Backups are written here by scripts/backup.sh (same default as the image).
+    BACKUP_DIR = os.environ.get("BACKUP_DIR", str(BASE_DIR / "backups"))
+    #: A status page warns when the newest successful backup is older than this.
+    BACKUP_STALE_HOURS = _int_env("BACKUP_STALE_HOURS", 48)
 
     #: Required in production.  ``create_app`` refuses to boot a production
     #: deployment without it; there is deliberately no usable fallback secret.
@@ -125,6 +149,25 @@ class Config:
     FEATURE_WEIGHBRIDGE = _bool_env("FEATURE_WEIGHBRIDGE", True)
     FEATURE_FLEET = _bool_env("FEATURE_FLEET", True)
     FEATURE_ACCOUNTING = _bool_env("FEATURE_ACCOUNTING", False)
+    #: The AI workspace is optional.  With no external provider configured it
+    #: still works: a deterministic, read-only assistant answers common stock,
+    #: sales and balance questions locally.  A provider failure must never
+    #: affect sales, stock or accounting; the workspace degrades to that local
+    #: mode instead.
+    FEATURE_AI = _bool_env("FEATURE_AI", True)
+
+    # --- AI workspace ------------------------------------------------
+    #: ``local`` (no network) or ``openai`` (any OpenAI-compatible
+    #: ``/chat/completions`` endpoint, including self-hosted gateways).
+    AI_PROVIDER = os.environ.get("AI_PROVIDER", "local").strip().lower()
+    AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+    AI_API_KEY = os.environ.get("AI_API_KEY")
+    AI_MODEL = os.environ.get("AI_MODEL", "gpt-4o-mini")
+    AI_TIMEOUT_SECONDS = _int_env("AI_TIMEOUT_SECONDS", 20)
+    AI_MAX_QUESTION_CHARS = _int_env("AI_MAX_QUESTION_CHARS", 1000)
+    AI_MAX_TOOL_ROUNDS = _int_env("AI_MAX_TOOL_ROUNDS", 3)
+    #: Requests per user per hour for the workspace ask endpoint.
+    AI_RATE_LIMIT_PER_HOUR = _int_env("AI_RATE_LIMIT_PER_HOUR", 30)
 
     # --- Accounting ------------------------------------------------
     #: Tax rates are *configuration*, never hard-coded into business logic.
@@ -167,10 +210,34 @@ class ProductionConfig(Config):
     PREFERRED_URL_SCHEME = "https"
 
 
+class BenchmarkConfig(Config):
+    """Disposable performance database only.
+
+    ``scripts/benchmark.py`` refuses to run unless the database name contains
+    ``bench``, ``perf`` or ``scratch`` and ``BENCHMARK_CONFIRM=1`` is set, so this
+    configuration cannot silently point at production.
+    """
+
+    ENVIRONMENT = "benchmark"
+    TESTING = True
+    DEBUG = False
+    SECRET_KEY = "benchmark-only-not-for-production"
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        "BENCHMARK_DATABASE_URL", f"sqlite:///{(INSTANCE_DIR / 'benchmark.db').as_posix()}"
+    )
+    SQLALCHEMY_ENGINE_OPTIONS: dict = {}
+    WTF_CSRF_ENABLED = False
+    SESSION_COOKIE_SECURE = False
+    REMEMBER_COOKIE_SECURE = False
+    LOGIN_MAX_ATTEMPTS = 1000
+    ITEMS_PER_PAGE = 25
+
+
 CONFIGS = {
     "development": DevelopmentConfig,
     "production": ProductionConfig,
     "testing": TestingConfig,
+    "benchmark": BenchmarkConfig,
     "default": DevelopmentConfig,
 }
 

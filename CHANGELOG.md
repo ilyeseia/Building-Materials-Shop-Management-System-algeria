@@ -4,9 +4,68 @@ All notable changes to this project are recorded here.  The project was audited
 and substantially rewritten in 2026; the entries below describe that work
 honestly, including what is **not** finished.
 
-Format based on Keep a Changelog.  Versions are not yet tagged.
+Format based on Keep a Changelog.  `1.1.0` is the current source version
+(`VERSION`); it has not yet been git-tagged.
 
-## [Unreleased] — Phase A audit, reliability fixes and market prices (2026-10-19)
+## [1.1.0] — AI workspace, operations and measured performance (2026-10-19)
+
+### Added
+
+* **Read-only AI workspace** (`/ai`, `app/services/ai.py`,
+  `app/blueprints/ai.py`, `app/models/ai.py`).  Eight permission-filtered tools
+  read stock, sales, receivables, payables and products; there is no write tool.
+  The default provider is a local deterministic assistant with no network access.
+  An optional OpenAI-compatible provider can be enabled with environment-only
+  credentials; any provider failure falls back locally.  Every exchange is
+  stored in the append-only `ai_interactions` table and audited.  Migration
+  `b2c3d4e5f6a7` adds the table and `business_settings.enable_ai`.
+* **System status and installation checks** (`/settings/system`,
+  `app/services/system_status.py`, `flask doctor`, `flask version`,
+  `flask license-status`).  Shows release/commit, schema revision, database size,
+  backup freshness, disk, AI provider configuration and transparent license
+  metadata without displaying secrets.
+* **Transparent license metadata** (`app/services/licensing.py`).  Optional
+  `instance/license.json` with an HMAC signature, displayed as information only.
+  A missing, invalid or expired license never disables a feature, deletes data or
+  blocks sign-in.
+* **Reproducible releases** (`VERSION`, `scripts/release.sh`, Docker build
+  arguments and OCI labels).  Archives exactly `HEAD`, writes a SHA-256 checksum
+  and a release manifest; refuses a dirty working tree.
+* **Scheduled backup operations** (`scripts/backup-cron.sh`,
+  `backup-offsite.sh`, `notify.sh`, `install-backup-schedule.sh`).  Host-side
+  daily cron, optional rclone off-site copy, optional webhook alerts, and a
+  `latest-failure.json` marker shown on the status page.
+* **Performance benchmark** (`scripts/benchmark.py`,
+  `docs/PERFORMANCE.md`, `docs/PERFORMANCE_REPORT_2026-10-19.json`).  Seeds a
+  guarded scratch database and records p50/p95 and SQL statement counts.
+* New commercial and AI documentation: `docs/COMMERCIAL.md`, `docs/AI.md`.
+
+### Fixed
+
+* **Per-invoice N+1 in reporting** (measured): the dashboard, receivables page,
+  sales invoice list and local AI overview called `paid_amount`/`credited_amount`
+  inside loops, producing ~1,000 SQL statements for 1,000 invoices.  Allocation
+  and credit-note totals are now aggregated once.  On the synthetic 1,000-invoice
+  scratch database the dashboard went from 1,014 queries / 993 ms p50 to 16
+  queries / 101 ms p50; receivables from 1,003 / 1,011 ms to 4 / 127 ms.
+  Regression tests fail if a per-invoice query returns.
+
+### Changed
+
+* `Dockerfile` and `docker-compose.yml` carry version/commit/build-date labels
+  and the AI/backup/license environment needed by the new features.
+* Full test suite: **229 passed**.
+
+### Known limitations
+
+* Off-site backup needs a customer-provided destination and credentials.
+* MySQL binlog/PITR is not configured; recovery is from the last verified dump.
+* The performance evidence currently uses a synthetic SQLite scratch database;
+  a MySQL scratch and concurrent load test are still required before quoting
+  production capacity.
+* No online activation, telemetry or remote lockout exists (deliberately).
+
+## [1.0.0] — Phase A audit, reliability fixes and market prices (2026-10-19)
 
 ### Added
 

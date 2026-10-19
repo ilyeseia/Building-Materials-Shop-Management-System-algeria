@@ -14,6 +14,7 @@ from app.blueprints.helpers import choices_for, fill_choices, handle_errors
 from app.security import requires
 from app.services import audit
 from app.services import settings as settings_service
+from app.services import system_status
 
 bp = Blueprint("settings", __name__)
 
@@ -61,6 +62,7 @@ def index():
             "enable_weighbridge": bool(form.enable_weighbridge.data),
             "enable_fleet": bool(form.enable_fleet.data),
             "enable_accounting": bool(form.enable_accounting.data),
+            "enable_ai": bool(form.enable_ai.data),
             "default_warehouse_id": form.default_warehouse_id.data or None,
             "bank_details": form.bank_details.data,
             "invoice_footer": form.invoice_footer.data,
@@ -72,3 +74,10 @@ def index():
         return redirect(url_for("settings.index"))
 
     return render_template("settings/index.html", form=form, settings=settings)
+
+
+@bp.get("/settings/system")
+@requires("settings.manage")
+def system():
+    """Read-only release, database, backup, license and installation status."""
+    return render_template("settings/system.html", status=system_status.get_system_status())

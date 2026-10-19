@@ -172,6 +172,56 @@ def test_dashboard_separates_revenue_cost_and_margin(customer, product, warehous
     assert kpis["stock_value"] == Decimal("90000.00")
 
 
+def test_dashboard_query_count_does_not_grow_per_invoice(
+    customer, product, warehouse
+):
+    """Measured N+1 regression guard.
+
+    The dashboard previously called ``invoice.paid_amount`` inside a loop,
+    producing ~1,000 statements for 1,000 invoices.  Balances are now aggregated
+    once; this test fails if a per-invoice query comes back.
+    """
+    from sqlalchemy import event
+
+    give_stock(product, warehouse, "50")
+    for _ in range(15):
+        _invoice(customer, product, warehouse, "1")
+
+    counter = {"queries": 0}
+
+    def count(*_args):
+        counter["queries"] += 1
+
+    event.listen(db.engine, "before_cursor_execute", count)
+    try:
+        reporting.dashboard_kpis()
+    finally:
+        event.remove(db.engine, "before_cursor_execute", count)
+    assert counter["queries"] < 25
+
+
+def test_invoice_settlements_batch_query_count(customer, product, warehouse):
+    from sqlalchemy import event
+
+    give_stock(product, warehouse, "50")
+    invoices = [
+        _invoice(customer, product, warehouse, "1") for _ in range(15)
+    ]
+    counter = {"queries": 0}
+
+    def count(*_args):
+        counter["queries"] += 1
+
+    event.listen(db.engine, "before_cursor_execute", count)
+    try:
+        settlements = reporting.invoice_settlements(invoices)
+    finally:
+        event.remove(db.engine, "before_cursor_execute", count)
+    assert len(settlements) == 15
+    assert all(row["status"] == "unpaid" for row in settlements.values())
+    assert counter["queries"] <= 4
+
+
 def test_dashboard_margin_is_undefined_not_zero_when_nothing_was_sold(product, warehouse):
     give_stock(product, warehouse, "10", unit_cost="1000")
     db.session.commit()

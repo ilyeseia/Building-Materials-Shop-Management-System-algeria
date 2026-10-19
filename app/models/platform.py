@@ -54,6 +54,9 @@ class BusinessSettings(TimestampMixin, db.Model):
     enable_weighbridge = db.Column(db.Boolean, nullable=False, default=True)
     enable_fleet = db.Column(db.Boolean, nullable=False, default=True)
     enable_accounting = db.Column(db.Boolean, nullable=False, default=False)
+    #: Administrators may switch the AI workspace off for the whole business.
+    #: Turning it off never affects sales, stock or accounting.
+    enable_ai = db.Column(db.Boolean, nullable=False, default=True)
 
     # Operational parameters ----------------------------------------
     default_warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"))

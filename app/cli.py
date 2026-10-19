@@ -206,6 +206,55 @@ def register_cli(app) -> None:
         legacy = detect_legacy()
         click.echo(f"Legacy tables    : {', '.join(legacy) if legacy else 'none'}")
 
+    @app.cli.command("version")
+    def version_command() -> None:
+        """Print the release identity (safe to run in production)."""
+        click.echo(f"Version     : {current_app.config.get('APP_VERSION')}")
+        click.echo(f"Commit      : {current_app.config.get('BUILD_COMMIT') or 'unknown'}")
+        click.echo(f"Build date  : {current_app.config.get('BUILD_DATE') or 'unknown'}")
+        click.echo(f"Environment : {current_app.config.get('ENVIRONMENT')}")
+
+    @app.cli.command("doctor")
+    def doctor() -> None:
+        """Run installation and operational checks; exit 1 only on a hard failure."""
+        from app.services import system_status
+        from app.i18n import translate
+
+        status = system_status.get_system_status()
+        click.echo(f"Version     : {status['app']['version']} ({status['app']['commit']})")
+        click.echo(f"Environment : {status['app']['environment']}")
+        click.echo("")
+        counts = {system_status.PASS: 0, system_status.WARN: 0, system_status.FAIL: 0}
+        for check in status["checks"]:
+            counts[check["status"]] = counts.get(check["status"], 0) + 1
+            label = translate(f"system.check.{check['key']}", language="en")
+            click.echo(f"[{check['status'].upper():4}] {label}: {check['detail']}")
+        click.echo("")
+        click.echo(
+            f"Summary: {counts[system_status.PASS]} pass, "
+            f"{counts[system_status.WARN]} warning, {counts[system_status.FAIL]} fail"
+        )
+        click.echo(f"Overall: {status['overall'].upper()}")
+        if counts[system_status.FAIL]:
+            raise click.exceptions.Exit(1)
+
+    @app.cli.command("license-status")
+    def license_status_command() -> None:
+        """Print the optional license metadata.  Never locks anything."""
+        from app.services import licensing
+
+        status = licensing.load_license()
+        click.echo(f"Status      : {status.status}")
+        click.echo(f"Licensee    : {status.licensee or '-'}")
+        click.echo(f"Edition     : {status.edition}")
+        click.echo(f"Issued      : {status.issued_at or '-'}")
+        click.echo(f"Expires     : {status.expires_at or 'perpetual'}")
+        if status.days_remaining is not None:
+            click.echo(f"Days left   : {status.days_remaining}")
+        click.echo(f"Signature   : {'valid' if status.signature_valid else ('unverified' if status.signature_valid is None else 'invalid')}")
+        click.echo(f"Enforcement : none (a missing or expired license never disables the application)")
+        click.echo(f"Detail      : {status.detail}")
+
     @app.cli.command("ensure-sequences")
     def ensure_sequences() -> None:
         """Create any missing document-number sequence."""

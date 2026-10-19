@@ -28,6 +28,8 @@
 .env
 .env.*
 !.env.example
+backup.env
+/backup.env
 
 # --- Local runtime data (volumes are mounted at run time instead) -----------
 /instance/

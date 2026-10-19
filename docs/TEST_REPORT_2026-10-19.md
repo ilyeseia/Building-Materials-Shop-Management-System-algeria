@@ -1,9 +1,12 @@
 # Test and verification report - 2026-10-19
 
-**Revision:** `7211b7a`  
-**Application suite:** **203 passed, 0 failed, 0 skipped** in 73.27 s  
-**Environment:** Windows x64, Python 3.14.3, pytest 9.1.1, SQLite test database  
-**Production:** MySQL 8.0.46, schema revision `a1b2c3d4e5f6`, 51 objects / 179 foreign keys
+**Revision:** working tree after the AI/status/performance changes (deployed commit is
+recorded in the handover; the last fully pushed docs commit was `f081388`)
+**Application suite:** **229 passed, 0 failed, 0 skipped** in 78.64 s
+**Environment:** Windows x64, Python 3.14.3, pytest 9.1.1, SQLite test database
+**Production at time of Phase A evidence:** MySQL 8.0.46, revision `a1b2c3d4e5f6`,
+51 objects / 179 foreign keys.  The AI migration `b2c3d4e5f6a7` is newer and must
+be applied before using the workspace in production.
 
 > The older file `docs/TEST_REPORT.md` describes the 184-test baseline.  This
 > file is the authoritative report for the current revision.
@@ -24,6 +27,10 @@
 | `tests/test_cli.py` | User creation, password reset, database checks |
 | `tests/test_health.py` | Health endpoint and database probe |
 | `tests/test_market_prices.py` | Market observations, same/different unit, stale status, RBAC, audit, detail rendering |
+| `tests/test_ai.py` | Read-only tools, permission enforcement, audit, provider failure fallback, injection boundary, truncation |
+| `tests/test_licensing.py` | Community/valid/expired/invalid license, HMAC signature, explicit non-enforcement |
+| `tests/test_system_status.py` | Status page permissions/secrets, backup marker, `doctor`/`version`/`license-status` CLI |
+| `tests/test_reporting.py` (new cases) | Query-count regression for dashboard and invoice settlement batch |
 
 The suite result was produced with:
 
@@ -76,6 +83,54 @@ PASS
 The production database is nearly empty (1 product, 7 categories, 0 stock
 movements, 0 customers, 0 invoices, 0 payments, 25 audit events, 1 user), so
 these results do **not** represent a performance or capacity test.
+
+### 2.4 AI workspace (SQLite suite; provider mocked)
+
+| Check | Result |
+|---|---|
+| `/ai` requires `ai.view`; a driver role receives 403 | PASS |
+| Admin page renders with CSRF form and read-only tool list | PASS |
+| Local assistant executes permitted tools and returns an answer | PASS |
+| `execute_tool` re-checks permissions server-side; a cashier cannot read stock | PASS |
+| Unknown/write tool name (`delete_product`) is refused before any handler | PASS |
+| Question and answer stored in `ai_interactions`; `ai_query` audit event written | PASS |
+| No product row changes during an AI question | PASS |
+| External provider failure falls back locally with status `unavailable` | PASS |
+| Provider tool result is passed with `tool` role, never as a system message | PASS |
+| Empty question refused; oversized question truncated, not rejected | PASS |
+| No database rollback on a read-only tool failure | PASS |
+
+No test reaches the network.  The provider tests monkeypatch the HTTP client with
+a fake response; they do not prove an external provider account works.  That
+requires a customer key and is **NOT TESTED** here.
+
+### 2.5 Licensing and system status
+
+| Check | Result |
+|---|---|
+| Missing license reports `community`, never enforces | PASS |
+| Valid unsigned license reports `unverified`, never enforces | PASS |
+| Expired/malformed/tampered license reports `expired`/`invalid`, never enforces | PASS |
+| HMAC-signed license verifies; a changed licensee fails the signature | PASS |
+| `/settings/system` requires `settings.manage`; viewer receives 403 | PASS |
+| Status page renders version and checks but not `SECRET_KEY` | PASS |
+| `flask doctor` reports pass/warn/fail; `version` and `license-status` exit 0 | PASS |
+
+### 2.6 Measured performance (synthetic SQLite scratch)
+
+A disposable database was seeded with 300 products, 500 customers and 1,000
+posted invoices (1,500 lines, 500 payments).  The benchmark found and then
+verified the removal of a per-invoice N+1:
+
+| Page | Before | After |
+|---|---|---|
+| Dashboard | 1,014 queries, 993 ms p50 | **16 queries, 101 ms p50** |
+| Receivables | 1,003 queries, 1,011 ms p50 | **4 queries, 127 ms p50** |
+| Sales invoice list | 139 queries, 127 ms p50 | **4 queries, 17 ms p50** |
+| Local AI overview | 979 ms p50 | **94 ms p50** |
+
+Details, method and caveats are in `docs/PERFORMANCE.md`.  This is **not** a
+MySQL or concurrent-load result; MySQL capacity remains **PARTIAL / NOT TESTED**.
 
 ## 3. Backup and restore
 

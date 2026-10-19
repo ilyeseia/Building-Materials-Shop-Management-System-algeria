@@ -74,6 +74,13 @@ All configuration lives in `.env` (copy of `.env.example`, git-ignored).
 | `CURRENCY` / `CURRENCY_SYMBOL` | `DZD` / `DA` | Display currency. |
 | `DEFAULT_VAT_RATE` | `19` | Percentage, not a fraction: `19` = 19 %. |
 | `FEATURE_WEIGHBRIDGE` / `FEATURE_FLEET` / `FEATURE_ACCOUNTING` | `1` / `1` / `0` | Module switches. |
+| `FEATURE_AI` | `1` | Read-only AI workspace switch. |
+| `AI_PROVIDER` | `local` | `local` (offline, no key) or an OpenAI-compatible provider. |
+| `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | OpenAI defaults / empty | External provider settings; the key is environment-only and never stored. |
+| `AI_TIMEOUT_SECONDS` / `AI_MAX_TOOL_ROUNDS` | `20` / `3` | Provider timeout and maximum read-only tool rounds. |
+| `APP_VERSION` / `BUILD_COMMIT` / `BUILD_DATE` | `VERSION` / unknown | Release identity shown on the status page and in image labels. |
+| `BACKUP_STALE_HOURS` | `48` | Status page warns when the latest successful backup is older. |
+| `LICENSE_FILE` / `LICENSE_SECRET` | `instance/license.json` / empty | Transparent license metadata and optional HMAC verification; never enforced. |
 | `GUNICORN_WORKERS` | `3` | Worker processes. `2 x CPU + 1` is a good starting point. |
 | `GUNICORN_LOG_LEVEL` | `info` | Gunicorn log level. |
 | `FORWARDED_ALLOW_IPS` | *(unset → `127.0.0.1`)* | Proxy addresses trusted for `X-Forwarded-*`. Set to `*` only when the app port is reachable exclusively through the proxy. |
@@ -111,7 +118,11 @@ $EDITOR .env                # SECRET_KEY, MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD,
 docker compose config --quiet && echo "compose ok"
 
 # 4. Build and start (the database health check is waited for automatically)
-docker compose up -d --build
+docker compose build \
+  --build-arg APP_VERSION="$(cat VERSION)" \
+  --build-arg BUILD_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" \
+  --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+docker compose up -d
 
 # 5. Check the state - both services must report "healthy"
 docker compose ps
@@ -121,7 +132,16 @@ docker compose exec app /app/scripts/docker-init.sh
 
 # 7. Create the administrator (interactive password prompt)
 docker compose exec app flask create-user --username admin --role admin
+
+# 8. Installation checks and release identity
+docker compose exec app flask doctor
+docker compose exec app flask version
 ```
+
+Then sign in and open **Settings → System status** (`/settings/system`).  A
+`FAIL` in `doctor` exits non-zero and must be fixed before entering real data; a
+`WARN` is a limitation to review (for example, no backup yet or no off-site
+destination).
 
 Access the interface at `http://<BIND_ADDRESS>:<HOST_PORT>` (for example
 `http://localhost:8080`, or `http://<server-ip>:8090` when the port was
@@ -246,7 +266,7 @@ docker volume ls | grep building-materials
 | Stop / start | `docker compose stop` / `docker compose start` | yes |
 | Restart | `docker compose restart` | yes |
 | Rebuild after a code change | `docker compose up -d --build` | yes |
-| Update from Git | `git pull && docker compose up -d --build` then `docker compose exec app flask db upgrade` | yes |
+| Update from Git | back up + verify, `git pull`, `docker compose build`, `docker compose run --rm app flask db upgrade`, `docker compose up -d --no-deps app` | yes, with a verified pre-update backup |
 | Health check by hand | `curl -fsS http://127.0.0.1:8080/healthz` | yes |
 | Backup | `docker compose exec app /app/scripts/backup.sh` | yes |
 | Restore | see section 8 | **destructive** |
@@ -322,27 +342,76 @@ docker compose up -d app
 If the restore fails, the printed report names the safety backup.  Restore that
 safety backup with the same procedure before investigating.
 
-### 8.4 Scheduled backups and off-site copies
+### 8.4 Scheduled backups, off-site copies and alerts
 
-Schedule a daily backup from the host, for example with cron:
-
-```cron
-# 02:15 Africa/Algiers, log to the deploy user's home directory
-15 2 * * * cd /home/sysuser/apps/building-materials-shop && \
-  docker compose exec -T app /app/scripts/backup.sh >> /home/sysuser/bmshop-backup.log 2>&1
-```
-
-Then copy the backup archives to a different machine or object store.  A backup
-that only exists on the server it protects is not a backup:
+The host-side wrapper runs the in-container backup, then the optional off-site
+copy and notification:
 
 ```bash
-docker compose exec -T app tar -czf - -C /app/backups . > backups-$(date +%F).tar.gz
-scp backups-$(date +%F).tar.gz backup-host:/srv/bmshop/
+./scripts/install-backup-schedule.sh --print   # inspect the cron line first
+./scripts/install-backup-schedule.sh           # install daily 02:15 cron
 ```
 
-Run `./scripts/verify-backup.sh` monthly and after every upgrade.  Backups are
-not encrypted by the script; store the off-site copy on encrypted storage and
-restrict access because the dump contains business and personal data.
+It writes `backups-cron.log` in the project directory.  `scripts/backup-cron.sh`
+never restores or drops a database.  A failed run writes
+`/app/backups/latest-failure.json`, which the system status page shows next to
+the last successful backup; the marker is removed on the next success.
+
+Off-site copy requires an rclone destination and credentials supplied by the
+customer:
+
+```bash
+rclone config                                  # one-time
+export BACKUP_REMOTE="remote:bmshop-backups"
+./scripts/backup-offsite.sh                    # docker compose cp + rclone copy/check
+```
+
+If `BACKUP_REMOTE` is empty the script reports `skipped`; the status page will
+still show only the local backup.  Do not claim an off-site copy exists until
+this succeeds and the remote is tested.  For the scheduled job, create a
+mode-600 `backup.env` in the project directory; `backup-cron.sh` sources it
+because cron does not inherit your shell:
+
+```bash
+install -m 600 /dev/null backup.env
+printf '%s\n' 'BACKUP_REMOTE="remote:bmshop-backups"' >> backup.env
+# optional: printf '%s\n' 'BACKUP_NOTIFY_WEBHOOK="https://..."' >> backup.env
+```
+
+Alerts use a Slack-compatible webhook:
+
+```bash
+export BACKUP_NOTIFY_WEBHOOK="https://hooks.example/..."
+./scripts/notify.sh success "manual test"
+```
+
+A webhook failure is non-fatal and does not change the backup result.  Run
+`./scripts/verify-backup.sh` monthly and after every upgrade.  Backups are not
+encrypted by the script; use encrypted storage and restrict access because the
+dump contains business and personal data.
+
+### 8.5 Recovery limits
+
+The supported recovery point is the last verified dump.  MySQL binary
+logging/PITR is **not configured**; do not promise minute-level recovery until
+binlog retention, off-host log shipping and a tested PITR drill exist.
+
+### 8.6 System status and installation checks
+
+As an administrator, open **Settings → System status** (`/settings/system`) or
+run:
+
+```bash
+docker compose exec app flask doctor
+docker compose exec app flask version
+docker compose exec app flask license-status
+```
+
+The page reports release/commit/build date, schema revision, table count,
+database size, backup age/checksum/failure marker, disk space, AI provider
+configuration, license metadata and pass/warn/fail checks.  It does not display
+passwords, API keys or the database URL.  A missing or expired license is a
+warning, never a lockout.
 
 ---
 

@@ -108,6 +108,16 @@ class LoginForm(BaseForm):
     submit = SubmitField("auth.sign_in")
 
 
+class AIQuestionForm(BaseForm):
+    """One question for the read-only AI workspace."""
+
+    question = TextAreaField(
+        "ai.question",
+        validators=[DataRequired(), Length(min=3, max=1000)],
+    )
+    submit = SubmitField("ai.ask")
+
+
 class ChangePasswordForm(BaseForm):
     current_password = PasswordField("auth.current_password", validators=[DataRequired()])
     new_password = PasswordField("auth.new_password", validators=[DataRequired(), Length(min=8)])
@@ -440,6 +450,7 @@ class SettingsForm(BaseForm):
     enable_weighbridge = BooleanField("settings.enable_weighbridge")
     enable_fleet = BooleanField("settings.enable_fleet")
     enable_accounting = BooleanField("settings.enable_accounting")
+    enable_ai = BooleanField("settings.enable_ai")
     default_warehouse_id = SelectField("stock.default_warehouse", coerce=int, choices=[], validate_choice=False)
     bank_details = TextAreaField("settings.bank_details", validators=[Optional()])
     invoice_footer = TextAreaField("settings.invoice_footer", validators=[Optional()])

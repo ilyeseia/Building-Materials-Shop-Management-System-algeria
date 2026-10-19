@@ -20,7 +20,22 @@
 set -euo pipefail
 
 log()  { printf '[backup] %s\n' "$*"; }
-fail() { printf '[backup] ERROR: %s\n' "$*" >&2; exit 1; }
+fail() {
+    local reason="$*"
+    printf '[backup] ERROR: %s\n' "$reason" >&2
+    # Record the failure where the administrator status page can see it.  This
+    # marker is best-effort: a read-only disk must not hide the original error.
+    if [ -n "${BACKUP_DIR:-}" ]; then
+        mkdir -p "$BACKUP_DIR" 2>/dev/null || true
+        escaped="$(printf '%s' "$reason" | tr '\n' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g')"
+        printf '{"created_at":"%s","status":"failed","reason":"%s"}\n' \
+            "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$escaped" \
+            > "$BACKUP_DIR/latest-failure.json.part" 2>/dev/null \
+            && mv "$BACKUP_DIR/latest-failure.json.part" "$BACKUP_DIR/latest-failure.json" 2>/dev/null \
+            || true
+    fi
+    exit 1
+}
 
 BACKUP_DIR="${BACKUP_DIR:-/app/backups}"
 DB_HOST="${DB_HOST:-db}"
@@ -143,6 +158,7 @@ cat > "$latest_tmp" <<EOF
 }
 EOF
 mv "$latest_tmp" "${BACKUP_DIR}/latest.json"
+rm -f "${BACKUP_DIR}/latest-failure.json"
 
 log "Pruning backups older than ${RETENTION_DAYS} days ..."
 find "$BACKUP_DIR" -maxdepth 1 -name 'bmshop-*' -type f -mtime "+${RETENTION_DAYS}" -delete

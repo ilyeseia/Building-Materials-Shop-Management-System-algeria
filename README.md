@@ -33,13 +33,23 @@ test evidence is in [`docs/TEST_REPORT_2026-10-19.md`](docs/TEST_REPORT_2026-10-
 | Transport | Vehicles, drivers, carriers, trips, trip expenses and cost per trip |
 | Finance | Customer and supplier payments, allocation to invoices, receivables/payables ageing |
 | Reporting | Stock, sales, purchases, margins, ageing, weighbridge and transport reports |
-| Administration | Users, roles and permissions, business settings, audit log, backups |
+| AI workspace | Read-only, permission-filtered questions over stock, sales and balances; local by default, optional OpenAI-compatible provider |
+| Administration | Users, roles and permissions, business settings, audit log, backups, system status, installation checks, transparent license metadata |
 
 Market reference prices are recorded separately from the shop's selling prices.  An observation
 carries its source, date, place, unit and verification status.  It **never** overwrites
 `products.sale_price` automatically, and a percentage difference is shown only when the
 observation and the product use the same unit.  Observations older than
 `MARKET_PRICE_STALE_DAYS` (default 30) are flagged as needing an update.
+
+The AI workspace (`/ai`) answers business questions through a fixed set of
+**read-only** tools.  Every tool re-checks the signed-in user's permission; there
+is no write tool.  The default local assistant needs no network or API key, and a
+provider outage falls back locally without touching sales, stock or accounting.
+Questions are recorded in an append-only table and audited.  See
+[`docs/AI.md`](docs/AI.md).  Commercial installation, licensing and release
+procedures are in [`docs/COMMERCIAL.md`](docs/COMMERCIAL.md); measured
+performance and its limits are in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 ## Algerian localisation
 
@@ -70,7 +80,13 @@ docker compose config --quiet          # refuses to start while a required value
 docker compose up -d --build           # application + MySQL 8, both health-checked
 docker compose exec app /app/scripts/docker-init.sh   # migrations + reference data
 docker compose exec app flask create-user --username admin --role admin
+docker compose exec app flask doctor                  # installation checks
+docker compose exec app flask version                 # release identity
 ```
+
+Sign in and open **Settings → System status** (`/settings/system`) for the
+release, database revision, backup freshness, disk, AI and license status.  The
+same checks are available as text with `flask doctor`.
 
 The interface is then on `http://<BIND_ADDRESS>:<HOST_PORT>` (default `http://localhost:8080`).
 
@@ -94,6 +110,17 @@ older than `BACKUP_RETENTION_DAYS`.  Restore drills are non-destructive:
 The script imports the dump into an isolated `bmshop_verify_*` database, runs `mysqlcheck`,
 foreign-key and stock/payment integrity checks, then drops the scratch database.  It never writes
 to the live database.  See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#8-backup-and-restore).
+
+A host-side daily schedule can be installed after testing a manual run:
+
+```bash
+./scripts/install-backup-schedule.sh --print   # inspect
+./scripts/install-backup-schedule.sh           # daily 02:15 cron
+```
+
+`BACKUP_REMOTE` enables an rclone off-site copy and `BACKUP_NOTIFY_WEBHOOK` enables success/failure
+alerts.  Off-site storage is **not configured** until a destination and credentials are supplied;
+the status page never pretends otherwise.  PITR/binlog recovery is not implemented.
 
 Full instructions, configuration reference, HTTPS/reverse-proxy setup, backup/restore drill,
 upgrade procedure and troubleshooting are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
@@ -146,14 +173,15 @@ to a default.
 ## Tests
 
 ```bash
-pytest -q                 # 203 tests
+pytest -q                 # 229 tests
 pytest -q tests/test_health.py tests/test_cli.py
 ```
 
 The suite covers authentication and authorisation, catalogue and units, the stock ledger and
 oversell protection, the full sales and purchasing chains, payments and ageing, the weighbridge
-and transport modules, reports, security headers and CSRF, the health endpoint, and the legacy
-database upgrade path. Evidence, including what is *not* covered, is in
+and transport modules, reports, security headers and CSRF, the health endpoint, the read-only AI
+workspace and its provider fallback, market prices, licensing/system status, query-count
+regressions, and the legacy database upgrade path. Evidence, including what is *not* covered, is in
 [`docs/TEST_REPORT_2026-10-19.md`](docs/TEST_REPORT_2026-10-19.md).  The older
 `docs/TEST_REPORT.md` describes the previous 184-test baseline.
 
@@ -163,7 +191,8 @@ database upgrade path. Evidence, including what is *not* covered, is in
 
 | Environment | What was verified | Result |
 |---|---|---|
-| Windows x64, Python 3.14.3 | `pytest -q` (whole suite) at revision `7211b7a` | **203 passed** |
+| Windows x64, Python 3.14.3 | `pytest -q` (whole suite) after the AI/status/performance work | **229 passed** |
+| Windows x64, SQLite scratch | 300 products / 500 customers / 1,000 invoices; dashboard N+1 removed | **1,014 → 16 queries**, p50 993 → 101 ms |
 | Ubuntu 24.04.3, Docker 29.2.0, Compose v5.0.2 | `docker compose config --quiet`, `docker compose build` | ok |
 | MySQL 8.0.46 container | `flask db upgrade` + `flask init-db`, **51 tables**, 179 foreign keys | ok |
 | Disposable MySQL | Full migration from empty schema through `a1b2c3d4e5f6`, catalog pages 200, market POST 302, selling price unchanged | ok |
@@ -173,6 +202,7 @@ database upgrade path. Evidence, including what is *not* covered, is in
 | Running stack | Data survives `restart`, image rebuild and container recreation | ok |
 | Running stack | Backup + isolated verification + disposable destructive restore drill | ok |
 | Production | Revision `7211b7a` deployed non-destructively; revision `a1b2c3d4e5f6`; existing rows preserved | ok |
+| Local tests | Read-only AI tools, permission filtering, provider failure fallback, audit, licensing non-enforcement, status page | **229 passed** |
 | Built image | Production refuses to boot without `SECRET_KEY`/`DATABASE_URL`; no secret in the image | ok |
 | tsdproxy (tailnet + Funnel) | HTTPS publication, `GET /healthz` = 200 from the tailnet and from the public internet | ok |
 
@@ -193,9 +223,9 @@ app/
   translations/        Arabic, French and English catalogues
   static/              application CSS and JavaScript
 migrations/            Alembic chain (versioned, reversible, preserves user data)
-scripts/               entrypoint.sh, docker-init.sh, backup.sh, restore.sh
+scripts/               entrypoint, init, backup/restore/verify, off-site, schedule, release, benchmark
 tests/                 pytest suite and fixtures
-docs/                  audit, deployment guide, test report
+docs/                  audit, deployment, AI, commercial, performance and test reports
 config.py              environment-driven configuration (development/testing/production)
 wsgi.py                WSGI entry point (`wsgi:app`)     app.py: development entry point
 docker-compose.yml     application + MySQL, health checks, volumes, network, tsdproxy labels
@@ -222,7 +252,14 @@ checks that were actually executed.
   driver is implemented.
 * Single-host Docker deployment; no Kubernetes manifests and no managed-database variant.
 * The Compose file pins `mysql:8.0`; MySQL 8.4+, MariaDB and PostgreSQL are not tested.
-* `scripts/restore.sh` restores from a logical dump — it is not point-in-time recovery.
+* `scripts/restore.sh` restores from a logical dump - it is not point-in-time recovery; MySQL
+  binlog/PITR is not configured or tested.
+* Off-site backup requires a customer-provided rclone destination; without it, only local backups
+  exist. The status page reports the local backup, not an off-site copy.
+* The local AI assistant is a bounded keyword router, not a general language model. The optional
+  external provider may be unavailable; the fallback is local and read-only.
+* Performance evidence currently uses a synthetic SQLite scratch database. A MySQL scratch and a
+  concurrent load test are required before quoting production capacity.
 * The MySQL client tools inside the image are MariaDB's and connect with TLS disabled inside the
   private Docker network (the application driver connects the same way).
 

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ t('system.title') }}{% endblock %}
+{% block content %}
+<h1>{{ t('system.title') }}</h1>
+<p class="small muted">{{ t('system.subtitle') }}</p>
+
+<div class="card">
+  <div class="card-head">
+    <div>
+      <h2>{{ t('system.overall') }}</h2>
+      <p class="small muted">{{ t('system.generated_at', when=status.generated_at) }}</p>
+    </div>
+    <span class="badge {{ 'confirmed' if status.overall == 'pass' else ('warning' if status.overall == 'warn' else 'failed') }}">
+      {{ t('system.status.' + status.overall) }}
+    </span>
+  </div>
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>{{ t('system.check') }}</th>
+          <th>{{ t('common.status') }}</th>
+          <th>{{ t('system.detail') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for check in status.checks %}
+        <tr>
+          <td>{{ t('system.check.' + check.key) }}</td>
+          <td>
+            <span class="badge {{ 'confirmed' if check.status == 'pass' else ('warning' if check.status == 'warn' else 'failed') }}">
+              {{ t('system.status.' + check.status) }}
+            </span>
+          </td>
+          <td class="mono small">{{ check.detail or t('system.not_available') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h2>{{ t('system.app') }}</h2>
+    <table class="data"><tbody>
+      <tr><th>{{ t('system.version') }}</th><td class="mono">{{ status.app.version }}</td></tr>
+      <tr><th>{{ t('system.commit') }}</th><td class="mono small">{{ status.app.commit }}</td></tr>
+      <tr><th>{{ t('system.build_date') }}</th><td class="mono small">{{ status.app.build_date }}</td></tr>
+      <tr><th>{{ t('system.environment') }}</th><td>{{ status.app.environment }}</td></tr>
+      <tr><th>{{ t('system.python') }}</th><td class="mono">{{ status.app.python }}</td></tr>
+      <tr><th>Flask / SQLAlchemy</th><td class="mono">{{ status.app.flask }} / {{ status.app.sqlalchemy }}</td></tr>
+      <tr><th>{{ t('system.timezone') }}</th><td class="mono">{{ status.app.timezone }}</td></tr>
+      <tr><th>{{ t('system.currency') }}</th><td class="mono">{{ status.app.currency }}</td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>{{ t('system.database') }}</h2>
+    <table class="data"><tbody>
+      <tr><th>{{ t('system.dialect') }}</th><td class="mono">{{ status.database.dialect }}</td></tr>
+      <tr><th>{{ t('system.server_version') }}</th><td class="mono">{{ status.database.server_version or t('system.not_available') }}</td></tr>
+      <tr><th>{{ t('system.schema_revision') }}</th><td class="mono">{{ status.database.revision or t('system.not_available') }}</td></tr>
+      <tr><th>{{ t('system.head_revision') }}</th><td class="mono">{{ status.database.head_revision or t('system.not_available') }}</td></tr>
+      <tr><th>{{ t('system.table_count') }}</th><td>{{ status.database.table_count if status.database.table_count is not none else t('system.not_available') }}</td></tr>
+      <tr><th>{{ t('system.size_mb') }}</th><td>{{ status.database.size_mb if status.database.size_mb is not none else t('system.not_available') }}</td></tr>
+      <tr><th>{{ t('system.connected') }}</th><td>{{ t('common.yes') if status.database.connected else t('common.no') }}</td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>{{ t('system.backups') }}</h2>
+    {% if status.backups.latest %}
+      <table class="data"><tbody>
+        <tr><th>{{ t('system.backup_latest') }}</th><td class="mono small">{{ status.backups.latest.base }}</td></tr>
+        <tr><th>{{ t('system.backup_age') }}</th><td>{{ status.backups.age_hours }} h</td></tr>
+        <tr><th>{{ t('system.backup_schema') }}</th><td class="mono">{{ status.backups.latest.schema_revision or t('system.not_available') }}</td></tr>
+        <tr><th>{{ t('system.backup_tables') }}</th><td>{{ status.backups.latest.table_count or t('system.not_available') }}</td></tr>
+        <tr><th>{{ t('system.backup_checksum') }}</th><td>{{ t('common.yes') if status.backups.checksum_present else t('common.no') }}</td></tr>
+        <tr><th>{{ t('system.backup_freshness') }}</th><td>{{ t('system.backup_stale') if status.backups.stale else t('system.backup_fresh') }}</td></tr>
+      </tbody></table>
+    {% else %}
+      <p class="small muted">{{ t('system.backup_none') }}</p>
+    {% endif %}
+    {% if status.backups.last_failure %}
+      <p class="small muted">{{ t('system.backup_failure', when=status.backups.last_failure.created_at) }}: <span class="mono">{{ status.backups.last_failure.reason }}</span></p>
+    {% endif %}
+    <p class="small muted mono">{{ status.backups.directory }}</p>
+  </div>
+
+  <div class="card">
+    <h2>{{ t('system.disk') }}</h2>
+    <table class="data"><tbody>
+      <tr><th>{{ t('system.path') }}</th><td class="mono small">{{ status.disk.path }}</td></tr>
+      <tr><th>{{ t('system.free') }}</th><td>{{ status.disk.free_gb }} GB / {{ status.disk.total_gb }} GB</td></tr>
+      <tr><th>{{ t('system.used') }}</th><td>{{ status.disk.used_percent }} %</td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>{{ t('system.license') }}</h2>
+    <table class="data"><tbody>
+      <tr><th>{{ t('system.license_status') }}</th><td>{{ t('system.license.' + status.license.status) }}</td></tr>
+      <tr><th>{{ t('system.licensee') }}</th><td>{{ status.license.licensee or t('system.not_available') }}</td></tr>
+      <tr><th>{{ t('system.edition') }}</th><td>{{ status.license.edition }}</td></tr>
+      <tr><th>{{ t('system.expires') }}</th><td class="mono">{{ status.license.expires_at or t('system.perpetual') }}</td></tr>
+      {% if status.license.days_remaining is not none %}
+        <tr><th>{{ t('system.days_remaining') }}</th><td>{{ status.license.days_remaining }}</td></tr>
+      {% endif %}
+    </tbody></table>
+    <p class="small muted">{{ t('system.license_note') }}</p>
+  </div>
+
+  <div class="card">
+    <h2>{{ t('system.ai') }}</h2>
+    <table class="data"><tbody>
+      <tr><th>{{ t('system.ai_enabled') }}</th><td>{{ t('common.yes') if status.ai.feature_enabled else t('common.no') }}</td></tr>
+      <tr><th>{{ t('ai.provider') }}</th><td class="mono">{{ status.ai.provider }}</td></tr>
+      <tr><th>{{ t('system.ai_configured') }}</th><td>{{ t('common.yes') if status.ai.configured else t('common.no') }}</td></tr>
+      <tr><th>{{ t('system.ai_model') }}</th><td class="mono">{{ status.ai.model or t('system.not_available') }}</td></tr>
+      <tr><th>{{ t('system.ai_timeout') }}</th><td>{{ status.ai.timeout_seconds }} s</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<p class="small muted">{{ t('system.install_hint') }}</p>
+<a class="btn secondary" href="{{ url_for('settings.index') }}">{{ t('system.open_settings') }}</a>
+{% endblock %}
