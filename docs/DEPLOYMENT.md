@@ -291,7 +291,7 @@ Run from the project directory on the host:
 
 The script verifies the checksum, creates a temporary database named
 `bmshop_verify_<timestamp>`, imports the dump, checks the table count,
-`alembic_version`, foreign keys, `mysqlcheck`, negative/over-reserved stock and
+`alembic_version`, foreign keys, `CHECK TABLE`, negative/over-reserved stock and
 overallocated payments, prints key row counts, and then drops the scratch
 database.  The live database is never opened for writes.  It is safe to run
 while the application is serving customers; because the shop can receive writes
@@ -406,19 +406,23 @@ the configuration on paper.
 | Check | Result |
 |---|---|
 | `docker compose config --quiet` | ok |
-| `docker compose build` | ok (three builds: initial, CLI fix, image hardening) |
+| `docker compose build` | ok (four builds: initial, CLI fix, image hardening, market-price release `7211b7a`) |
 | `docker compose up -d` — both containers report `healthy` | ok |
 | `GET /healthz` | `200 {"database":true,"status":"ok"}` |
 | `GET /login` / `GET /` | `200` / `302` to the sign-in page |
-| `flask db upgrade` on MySQL 8 | applied `0001_initial_algerian_schema` |
+| `flask db upgrade` on MySQL 8 | applied `0001_initial_algerian_schema`; later applied `a1b2c3d4e5f6` (market prices) on production |
 | `flask init-db` (create + seed, never drops) | ok — `{'units': 13, 'categories': 7, 'warehouses': 1, 'brands': 0}`; a second run creates nothing |
-| Schema size | 49 application tables + `alembic_version` = 50 objects in `information_schema` |
+| Schema size | 50 application tables + `alembic_version` = 51 objects in `information_schema`; 179 foreign keys |
 | Sign-in end to end through the real form: CSRF token from the page, wrong password → `401`, correct password → `302`, then 17 module pages | ok — all 17 pages return `200` |
-| Application suite, `pytest -q` (Ubuntu 24.04.3, Python 3.12.3) | **194 passed in 53.3 s** |
+| Application suite, `pytest -q` (Windows x64, Python 3.14.3) | **203 passed in 73.27 s** at revision `7211b7a` |
 | Data survives `docker compose restart app` | ok (user and product counts unchanged) |
 | Data survives an image rebuild + container recreation | ok |
 | Data survives `docker compose down` + `up -d` (volumes kept) | ok |
-| Backup + destructive restore drill | ok — checksums verified; a marker row planted *after* the dump was gone afterwards, a marker row present in the dump survived; 50 tables before and after; container healthy again, `/healthz` and `/login` back to 200 |
+| Backup + destructive restore drill | ok - checksums verified; a marker row planted *after* the dump was gone afterwards, a marker row present in the dump survived; 51 tables before and after; container healthy again, `/healthz` and `/login` back to 200 |
+| Isolated restore verification (`verify-backup.sh`) | ok - 51/51 tables, revision `a1b2c3d4e5f6`, 179 foreign keys, all tables passed `CHECK TABLE`, zero negative stock/orphan levels/overallocated payments; scratch database dropped |
+| Disposable `restore.sh` drill | ok - safety backup taken, 51/51 tables, `mysqlcheck` passed, report written, scratch database dropped; the first attempt without target privileges aborted before import as designed |
+| Payment concurrency on MySQL | ok - two processes, one `ALLOCATED`, one `REFUSED payment.exceeds_balance`, invoice paid 1 000.00 / balance 0.00 |
+| Market price on MySQL | ok - 51-table scratch DB migrated and seeded; list/detail/form 200, POST 302; market 2 000.00 did not alter selling price 1 800.00 |
 | Production refuses to boot without `SECRET_KEY`/`DATABASE_URL` | ok — exit code 1 with an explicit message; with both present it boots (`environment = production`) |
 | No `.env` and no secret value inside the image or its build history | ok |
 | Ports: only the application port published; nothing listens on host `3306` | ok |

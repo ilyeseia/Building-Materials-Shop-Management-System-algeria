@@ -46,7 +46,7 @@ esac
 
 SCRATCH="bmshop_verify_$(date -u +%Y%m%d%H%M%S)_$$"
 cleanup() {
-    $COMPOSE exec -T db sh -c "mysql --skip-ssl -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -e 'DROP DATABASE IF EXISTS ${SCRATCH};'" >/dev/null 2>&1 || true
+    $COMPOSE exec -T db sh -c "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql --ssl-mode=DISABLED -uroot -e 'DROP DATABASE IF EXISTS ${SCRATCH};'" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -61,19 +61,19 @@ dump_tables="$($COMPOSE exec -T app sh -c "gzip -cd '/app/backups/${NAME}-db.sql
 
 # --- Create an isolated database and import -------------------------------
 log "Creating isolated database ${SCRATCH} ..."
-$COMPOSE exec -T db sh -c "mysql --skip-ssl -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -e 'CREATE DATABASE ${SCRATCH} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'" \
+$COMPOSE exec -T db sh -c "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql --ssl-mode=DISABLED -uroot -e 'CREATE DATABASE ${SCRATCH} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'" \
     || fail "could not create the scratch database"
 
 log "Importing ${NAME} into ${SCRATCH} ..."
 if ! $COMPOSE exec -T app sh -c "gunzip -c '/app/backups/${NAME}-db.sql.gz'" \
-        | $COMPOSE exec -T db sh -c "mysql --skip-ssl -uroot -p\"\$MYSQL_ROOT_PASSWORD\" '${SCRATCH}'"; then
+        | $COMPOSE exec -T db sh -c "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql --ssl-mode=DISABLED -uroot '${SCRATCH}'"; then
     fail "the dump could not be imported"
 fi
 
 # --- Checks ---------------------------------------------------------------
 db_query() {
     local database="$1" sql="$2"
-    $COMPOSE exec -T db sh -c "mysql --skip-ssl -uroot -p\"\$MYSQL_ROOT_PASSWORD\" --batch --skip-column-names '${database}' -e \"${sql}\""
+    $COMPOSE exec -T db sh -c "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql --ssl-mode=DISABLED -uroot --batch --skip-column-names '${database}' -e \"${sql}\""
 }
 
 restored_tables="$(db_query "$SCRATCH" "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '${SCRATCH}';" | tr -d '\r')"
@@ -84,9 +84,13 @@ revision="$(db_query "$SCRATCH" 'SELECT version_num FROM alembic_version LIMIT 1
 [ -n "$revision" ] || fail "alembic_version is missing from the restored database"
 log "Schema revision          : ${revision}"
 
-log "Running mysqlcheck ..."
-$COMPOSE exec -T db sh -c "mysqlcheck --skip-ssl -uroot -p\"\$MYSQL_ROOT_PASSWORD\" --check '${SCRATCH}'" >/tmp/bmshop-verify-mysqlcheck.log 2>&1 \
-    || { cat /tmp/bmshop-verify-mysqlcheck.log; fail "mysqlcheck failed"; }
+log "Checking restored tables (CHECK TABLE) ..."
+table_list="$(db_query "$SCRATCH" "SELECT GROUP_CONCAT(table_name ORDER BY table_name SEPARATOR ', ') FROM information_schema.tables WHERE table_schema = '${SCRATCH}';" | tr -d '\r')"
+check_output="$(db_query "$SCRATCH" "CHECK TABLE ${table_list};")"
+if ! printf '%s\n' "$check_output" | awk -F'\t' 'NF >= 4 && ($3 != "status" || $4 != "OK") { print; bad=1 } END { exit bad }'; then
+    fail "CHECK TABLE reported an error; the restored database is not usable"
+fi
+log "All restored tables passed CHECK TABLE."
 
 negative_stock="$(db_query "$SCRATCH" 'SELECT COUNT(*) FROM stock_levels WHERE quantity < 0 OR reserved < 0 OR reserved > quantity;' | tr -d '\r')"
 [ "$negative_stock" = "0" ] || fail "restored stock contains negative or over-reserved quantities"
@@ -113,7 +117,7 @@ cat <<EOF
 [verify] Backup        : ${NAME}
 [verify] Scratch DB    : ${SCRATCH} (dropped automatically)
 [verify] Schema        : ${revision}
-[verify] Checks        : checksum, gzip, table count, mysqlcheck, foreign keys,
+[verify] Checks        : checksum, gzip, table count, CHECK TABLE, foreign keys,
                          stock invariants, payment allocations, key row counts
 [verify] The live database was not modified.
 EOF

@@ -6,7 +6,52 @@ honestly, including what is **not** finished.
 
 Format based on Keep a Changelog.  Versions are not yet tagged.
 
-## [Unreleased] — rebuilding the application
+## [Unreleased] — Phase A audit, reliability fixes and market prices (2026-10-19)
+
+### Added
+
+* **Market reference prices** (`market_prices` table, `app/models/market.py`,
+  `app/services/market.py`, catalog list/form/detail screens).  Observations
+  carry an explicit unit, source, date, place and verification status; they are
+  append-only and never overwrite a selling price.  A percentage difference is
+  shown only when the observation and product use the same unit.  Observations
+  older than `MARKET_PRICE_STALE_DAYS` (default 30) are flagged.
+* **Isolated backup verification** (`scripts/verify-backup.sh`): restores into a
+  temporary `bmshop_verify_*` database, checks 51/51 tables, `alembic_version`,
+  foreign keys, `CHECK TABLE`, stock invariants, payment allocations and key
+  row counts, then drops the scratch database.  The live database is untouched.
+* **Reproducible MySQL concurrency check** (`scripts/concurrency-check.py`).
+* A new migration `a1b2c3d4e5f6_market_prices.py`; production applied it
+  non-destructively.
+* Tests for market prices, stale/unit-mismatch comparisons and over-release.
+
+### Changed
+
+* **Payment allocation is concurrency-safe.**  The invoice is locked first, the
+  payment second, and allocation rows are read with a locking read so MySQL
+  REPEATABLE READ cannot hide a just-committed allocation.  A real two-process
+  MySQL drill produced one success and one `payment.exceeds_balance` refusal;
+  the invoice ended at 1 000.00 paid / 0.00 balance.
+* **Over-release is refused instead of silently clamped.**  The stock ledger
+  and the cached reservation can no longer diverge; the transaction rolls back.
+* **Backups** validate gzip and mysqldump's completion marker, write through
+  temporary files, emit checksums/manifest/`latest.json`, and prune only
+  `bmshop-*` files.
+* **Restore** requires a checksum (unless explicitly overridden), takes a
+  pre-restore safety backup, aborts if it fails, validates the files archive,
+  compares table counts, runs `mysqlcheck`, checks `alembic_version` and
+  negative stock, and writes a restore report.
+* Product list uses batch stock and latest-market queries instead of one query
+  per product.
+
+### Not implemented in this phase
+
+* AI workspace and read-only business tools.
+* Licensing, activation, commercial packaging, version/status administration.
+* Automatic backup scheduler, off-site copy automation, notifications, PITR.
+* Representative performance/load testing.
+* Authenticated browser acceptance remains blocked until the current production
+  administrator password is supplied or a reset is explicitly approved.
 
 ### Context — what the audited revision was
 
@@ -35,7 +80,7 @@ existing deployment is not surprised, but replaces the internals.
 * **Configuration** (`config.py`) driven entirely by environment variables, with
   development / testing / production classes.  Production refuses to start
   without `SECRET_KEY` and `DATABASE_URL`.
-* **Domain model** (`app/models/*`, 49 tables) covering catalog, inventory
+* **Domain model** (`app/models/*`, 50 tables) covering catalog, inventory
   ledger, sales, purchasing, payments, weighbridge, fleet, users/roles, audit,
   numbering and business settings.
 * **Service layer** (`app/services/*`): `stock`, `sales`, `purchasing`,

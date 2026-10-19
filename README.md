@@ -14,7 +14,10 @@ and reporting — with an Arabic-first (RTL) interface, Algerian VAT and the DZD
 The application is an application-factory Flask project (`wsgi:app`) with a service layer, a
 versioned migration chain and a test suite. It is a rebuild of an earlier single-file project:
 what was wrong with the original and how it was corrected is documented in
-[`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md).
+[`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md).  The current production
+baseline, reliability evidence and remaining risks are in
+[`docs/PHASE_A_VERIFIED_AUDIT.md`](docs/PHASE_A_VERIFIED_AUDIT.md); current
+test evidence is in [`docs/TEST_REPORT_2026-10-19.md`](docs/TEST_REPORT_2026-10-19.md).
 
 ---
 
