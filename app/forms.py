@@ -221,6 +221,39 @@ class ConversionForm(BaseForm):
     submit = SubmitField("common.save")
 
 
+class MarketPriceForm(BaseForm):
+    product_id = SelectField("product.title", coerce=int, choices=[], validate_choice=False)
+    unit_id = SelectField("common.unit", coerce=int, choices=_unit_choices, validate_choice=False)
+    price = DecimalField(
+        "market.price",
+        validators=[DataRequired(), NumberRange(min=Decimal("0.01"))],
+        places=2,
+    )
+    currency = StringField("common.currency", validators=[Optional(), Length(max=8)], default="DZD")
+    source_name = StringField(
+        "market.source_name", validators=[DataRequired(), Length(max=160)]
+    )
+    source_reference = StringField(
+        "market.source_reference", validators=[Optional(), Length(max=255)]
+    )
+    wilaya_code = SelectField("address.wilaya", coerce=int, choices=_wilaya_choices, default=0)
+    location = StringField("market.location", validators=[Optional(), Length(max=160)])
+    observed_on = DateField(
+        "market.observed_on", validators=[DataRequired()], default=date.today
+    )
+    verification_status = SelectField(
+        "market.verification_status",
+        choices=[("unverified", "market.unverified"), ("verified", "market.verified")],
+        default="unverified",
+    )
+    notes = TextAreaField("common.notes", validators=[Optional()])
+    submit = SubmitField("common.save")
+
+    def validate_observed_on(self, field):
+        if field.data and field.data > date.today():
+            raise ValidationError("val.date_in_future")
+
+
 class SalesDocumentForm(BaseForm):
     customer_id = SelectField("sale.customer", coerce=int, choices=[], validate_choice=False)
     document_date = DateField("common.date", validators=[DataRequired()], default=date.today)

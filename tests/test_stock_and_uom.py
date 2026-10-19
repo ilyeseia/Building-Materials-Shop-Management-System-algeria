@@ -137,6 +137,19 @@ def test_release_returns_the_quantity_to_available(product, warehouse):
     assert level.available == Decimal("10")
 
 
+def test_release_above_the_reservation_is_refused_without_clamping(product, warehouse):
+    give_stock(product, warehouse, "10")
+    stock.reserve(product, warehouse, Decimal("4"))
+
+    with pytest.raises(ValidationError) as error:
+        stock.release(product, warehouse, Decimal("5"))
+
+    assert error.value.message_key == "stock.release_exceeds_reserved"
+    level = stock.get_level(product, warehouse)
+    assert level.reserved == Decimal("4")
+    assert level.available == Decimal("6")
+
+
 # ---------------------------------------------------------------------------
 # Transfers and counts
 # ---------------------------------------------------------------------------

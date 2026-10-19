@@ -35,6 +35,74 @@
 <div class="flash warning">{{ t('product.low_stock_only') }}</div>
 {% endif %}
 
+<div class="card">
+  <div class="form-actions">
+    <h2>{{ t('market.title') }}</h2>
+    {% if can('catalog.manage') %}
+      <a class="btn secondary" href="{{ url_for('catalog.market_price_new', product=product.id) }}">{{ t('market.new') }}</a>
+    {% endif %}
+    <a class="btn ghost" href="{{ url_for('catalog.market_prices') }}">{{ t('market.all') }}</a>
+  </div>
+  {% if latest_market %}
+    <div class="grid cols-2">
+      <table class="data">
+        <tbody>
+          {{ kv('market.latest', (latest_market.price | money) ~ ' / ' ~ t('unit.' + latest_market.unit.code), 'num') }}
+          {{ kv('product.sale_price', (product.sale_price | money) ~ ' / ' ~ t('unit.' + product.stock_unit_code), 'num') }}
+          {% if market_comparison.comparable %}
+            {{ kv('market.difference', (('+' if market_comparison.difference > 0 else '') ~ (market_comparison.difference | money)) ~ ((' (' ~ ('+' if market_comparison.percent > 0 else '') ~ (market_comparison.percent | percent) ~ ')') if market_comparison.percent is not none else ''), 'num') }}
+          {% else %}
+            {{ kv('market.difference', t('market.different_unit')) }}
+          {% endif %}
+          {{ kv('market.observed_on', latest_market.observed_on | d) }}
+          {{ kv('market.verification_status', t('market.' + market_status)) }}
+          {{ kv('market.source_name', latest_market.source_name) }}
+          {{ kv('market.source_reference', latest_market.source_reference or '—') }}
+          {{ kv('market.location', (latest_market.location or (wilaya_name(latest_market.wilaya_code) if latest_market.wilaya_code else '—'))) }}
+        </tbody>
+      </table>
+      <div>
+        <p class="small muted">{{ t('market.age_hint', days=market_age_days, stale=market_stale_days) }}</p>
+        {% if latest_market.notes %}<p class="small">{{ latest_market.notes }}</p>{% endif %}
+        {% if not market_comparison.comparable %}
+          <div class="flash warning">{{ t('market.unit_mismatch_hint') }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <h3>{{ t('market.history') }}</h3>
+    <table class="data">
+      <thead>
+        <tr>
+          <th>{{ t('market.observed_on') }}</th>
+          <th class="num">{{ t('market.price') }}</th>
+          <th>{{ t('common.unit') }}</th>
+          <th>{{ t('market.source_name') }}</th>
+          <th>{{ t('market.location') }}</th>
+          <th>{{ t('market.verification_status') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for observation in market_history %}
+        <tr>
+          <td>{{ observation.observed_on | d }}</td>
+          <td class="num">{{ observation.price | money }}</td>
+          <td>{{ t('unit.' + observation.unit.code) }}</td>
+          <td>{{ observation.source_name }}{% if observation.source_reference %} — {{ observation.source_reference }}{% endif %}</td>
+          <td>{{ observation.location or (wilaya_name(observation.wilaya_code) if observation.wilaya_code else '—') }}</td>
+          <td>{{ t('market.' + observation.verification_status) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">{{ t('market.none') }}</p>
+    {% if can('catalog.manage') %}
+      <a class="btn" href="{{ url_for('catalog.market_price_new', product=product.id) }}">{{ t('market.record_first') }}</a>
+    {% endif %}
+  {% endif %}
+</div>
+
 <div class="grid cols-2">
   <div class="card">
     <h2>{{ t('product.title') }}</h2>

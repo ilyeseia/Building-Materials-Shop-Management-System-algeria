@@ -110,6 +110,19 @@ def total_on_hand(product: Product | int) -> Decimal:
     return Decimal(str(total or 0))
 
 
+def on_hand_by_product(product_ids: list[int]) -> dict[int, Decimal]:
+    """Return on-hand quantities for a page of products in one query."""
+    ids = [int(value) for value in product_ids if value is not None]
+    if not ids:
+        return {}
+    rows = db.session.execute(
+        select(StockLevel.product_id, func.coalesce(func.sum(StockLevel.quantity), 0))
+        .where(StockLevel.product_id.in_(ids))
+        .group_by(StockLevel.product_id)
+    ).all()
+    return {product_id: Decimal(str(quantity or 0)) for product_id, quantity in rows}
+
+
 def default_warehouse() -> Warehouse | None:
     from app.services.settings import get_settings
 
@@ -403,10 +416,16 @@ def release(
         .values(reserved=StockLevel.reserved - quantity)
     )
     if result.rowcount != 1:
-        # Releasing more than is reserved is a programming error, but never leave
-        # a negative reservation behind: clamp to zero.
-        db.session.execute(
-            update(StockLevel).where(StockLevel.id == level.id).values(reserved=ZERO)
+        # Releasing more than is reserved means the ledger and the cached
+        # reservation disagree.  Do not clamp silently: that would write a
+        # movement whose reserved_delta is larger than the reservation change
+        # and hide the inconsistency from the operator.  Raising rolls the
+        # caller's transaction back with the reservation untouched.
+        level_now = get_level(product, warehouse)
+        raise ValidationError(
+            "stock.release_exceeds_reserved",
+            requested=str(quantity),
+            reserved=str(level_now.reserved if level_now else 0),
         )
     _refresh(level)
     return _write_movement(

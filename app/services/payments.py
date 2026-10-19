@@ -18,9 +18,11 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import (
+    CreditNote,
     Customer,
     DocumentStatus,
     Payment,
@@ -71,6 +73,96 @@ def load_document(document_type: str, document_id: int):
 def document_balance(document) -> Decimal:
     """Outstanding balance of an invoice (total − paid − credited)."""
     return Decimal(document.balance_due or 0)
+
+
+# ---------------------------------------------------------------------------
+# Concurrency-safe loading
+# ---------------------------------------------------------------------------
+# Two cashiers can submit a receipt for the same invoice at the same time.  A
+# plain ``SELECT`` followed by an application-level check is not sufficient:
+# both requests see the old balance and both insert an allocation, over-settling
+# the invoice.  Every write path therefore locks the payment and the invoice
+# with ``SELECT ... FOR UPDATE`` *and* reads the allocation rows with a locking
+# read.  The locking read is important under MySQL's REPEATABLE READ: a normal
+# SELECT can keep using the transaction snapshot taken before the other
+# cashier committed.
+#
+# SQLite ignores ``FOR UPDATE`` (it serialises writers with a database lock),
+# so the same code remains portable for development and the test suite.
+
+def _lock_payment(payment: Payment) -> Payment:
+    """Re-load ``payment`` with its allocations and hold a row lock."""
+    if payment.id is None:  # pragma: no cover - callers flush first
+        return payment
+    locked = db.session.execute(
+        select(Payment)
+        .options(joinedload(Payment.allocations))
+        .where(Payment.id == payment.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).unique().scalar_one_or_none()
+    if locked is None:
+        raise NotFoundError("error.not_found")
+    return locked
+
+
+def _lock_document(document_type: str, document_id: int):
+    """Re-load an invoice and hold a row lock for the rest of the transaction."""
+    entry = _DOCUMENT_TYPES.get(document_type)
+    if entry is None:
+        raise ValidationError("payment.bad_document_type")
+    model, _party_field = entry
+    document = db.session.execute(
+        select(model)
+        .where(model.id == int(document_id))
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if document is None:
+        raise NotFoundError("error.not_found")
+    return document
+
+
+def _locked_paid_amount(document_type: str, document_id: int) -> Decimal:
+    """Sum posted allocations using a locking read (latest committed rows)."""
+    rows = db.session.execute(
+        select(PaymentAllocation.amount, Payment.status)
+        .join(Payment, Payment.id == PaymentAllocation.payment_id)
+        .where(
+            PaymentAllocation.document_type == document_type,
+            PaymentAllocation.document_id == int(document_id),
+        )
+        .with_for_update(of=PaymentAllocation)
+    ).all()
+    total = sum(
+        (Decimal(str(amount)) for amount, status in rows if status == DocumentStatus.POSTED.value),
+        Decimal("0"),
+    )
+    return total.quantize(MONEY_PLACES)
+
+
+def _locked_credited_amount(invoice_id: int) -> Decimal:
+    """Sum non-cancelled credit notes with a locking read."""
+    rows = db.session.execute(
+        select(CreditNote.total_amount)
+        .where(
+            CreditNote.invoice_id == invoice_id,
+            CreditNote.status != DocumentStatus.CANCELLED.value,
+        )
+        .with_for_update()
+    ).scalars().all()
+    total = sum((Decimal(str(value or 0)) for value in rows), Decimal("0"))
+    return total.quantize(MONEY_PLACES)
+
+
+def _document_balance_locked(document_type: str, document) -> Decimal:
+    paid = _locked_paid_amount(document_type, document.id)
+    credited = (
+        _locked_credited_amount(document.id)
+        if document_type == SALES_INVOICE
+        else Decimal("0")
+    )
+    return (Decimal(document.total_amount or 0) - paid - credited).quantize(MONEY_PLACES)
 
 
 def open_documents(document_type: str, party_id: int) -> list:
@@ -178,13 +270,22 @@ def allocate(
     *,
     actor=None,
 ) -> PaymentAllocation:
-    """Apply part of ``payment`` to one invoice, enforcing both ceilings."""
-    if payment.status != DocumentStatus.POSTED.value:
-        raise InvalidTransition("payment.reversed_locked")
+    """Apply part of ``payment`` to one invoice, enforcing both ceilings.
 
+    The payment and invoice rows are locked for the duration of the
+    transaction.  The second of two concurrent requests therefore sees the
+    allocation committed by the first one instead of over-settling the
+    invoice or the payment.
+    """
+    # Read the payment direction first, then lock the invoice, then lock the
+    # payment.  Every allocation path uses the same invoice -> payment order,
+    # so two cashiers settling the same invoice cannot deadlock over each
+    # other's payment row.
     transaction = _DIRECTION_FOR.get(document_type)
     if transaction is None:
         raise ValidationError("payment.bad_document_type")
+    if payment.status != DocumentStatus.POSTED.value:
+        raise InvalidTransition("payment.reversed_locked")
     if transaction != payment.direction:
         raise ValidationError("payment.direction_mismatch")
 
@@ -200,17 +301,29 @@ def allocate(
     if expected_party is None:
         raise ValidationError("val.required")
 
-    document = load_document(document_type, document_id)
+    document = _lock_document(document_type, document_id)
+    payment = _lock_payment(payment)
+    if payment.status != DocumentStatus.POSTED.value:
+        raise InvalidTransition("payment.reversed_locked")
+    if transaction != payment.direction:
+        raise ValidationError("payment.direction_mismatch")
+    expected_party = (
+        payment.customer_id
+        if payment.direction == PaymentDirection.INBOUND.value
+        else payment.supplier_id
+    )
     _model, party_field = _DOCUMENT_TYPES[document_type]
     if getattr(document, party_field) != expected_party:
         raise ValidationError("payment.party_mismatch")
     if document.status in {DocumentStatus.DRAFT.value, DocumentStatus.CANCELLED.value}:
         raise InvalidTransition("payment.not_allocatable")
 
-    if value > payment.unallocated_amount:
-        raise ValidationError("payment.exceeds_payment", amount=str(payment.unallocated_amount))
-    if value > document_balance(document):
-        raise ValidationError("payment.exceeds_balance", amount=str(document_balance(document)))
+    unallocated = payment.unallocated_amount
+    if value > unallocated:
+        raise ValidationError("payment.exceeds_payment", amount=str(unallocated))
+    balance = _document_balance_locked(document_type, document)
+    if value > balance:
+        raise ValidationError("payment.exceeds_balance", amount=str(balance))
 
     allocation = PaymentAllocation(
         # ``payment=payment`` (not ``payment_id=``) so the in-memory collection is

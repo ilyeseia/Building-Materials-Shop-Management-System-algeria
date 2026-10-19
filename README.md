@@ -22,7 +22,7 @@ what was wrong with the original and how it was corrected is documented in
 
 | Area | Contents |
 |---|---|
-| Catalogue | Products, categories, brands, units of measure, warehouses, per-product unit conversions |
+| Catalogue | Products, categories, brands, units of measure, warehouses, per-product unit conversions, market reference-price observations |
 | Inventory | Append-only stock ledger, adjustments, transfers, counts, reservations, low-stock view |
 | Sales | Quotation → order → delivery note → invoice → payment; credit notes; print/PDF documents |
 | Purchasing | Purchase order → goods receipt (landed cost) → supplier invoice → payment |
@@ -31,6 +31,12 @@ what was wrong with the original and how it was corrected is documented in
 | Finance | Customer and supplier payments, allocation to invoices, receivables/payables ageing |
 | Reporting | Stock, sales, purchases, margins, ageing, weighbridge and transport reports |
 | Administration | Users, roles and permissions, business settings, audit log, backups |
+
+Market reference prices are recorded separately from the shop's selling prices.  An observation
+carries its source, date, place, unit and verification status.  It **never** overwrites
+`products.sale_price` automatically, and a percentage difference is shown only when the
+observation and the product use the same unit.  Observations older than
+`MARKET_PRICE_STALE_DAYS` (default 30) are flagged as needing an update.
 
 ## Algerian localisation
 
@@ -71,7 +77,20 @@ health check.
 
 **Data**: `db-data` (MySQL), `app-instance` (generated documents) and `app-backups` (dumps) are
 named volumes. `docker compose down` keeps them, `docker compose down -v` **deletes the business
-data** — never use `-v` on an installation you care about.
+data** - never use `-v` on an installation you care about.
+
+**Backups**: `docker compose exec app /app/scripts/backup.sh` takes a consistent dump, validates
+the gzip and completion marker, writes checksums/manifest/`latest.json`, and prunes only backups
+older than `BACKUP_RETENTION_DAYS`.  Restore drills are non-destructive:
+
+```bash
+./scripts/verify-backup.sh                  # latest backup
+./scripts/verify-backup.sh <backup-name>    # specific backup
+```
+
+The script imports the dump into an isolated `bmshop_verify_*` database, runs `mysqlcheck`,
+foreign-key and stock/payment integrity checks, then drops the scratch database.  It never writes
+to the live database.  See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#8-backup-and-restore).
 
 Full instructions, configuration reference, HTTPS/reverse-proxy setup, backup/restore drill,
 upgrade procedure and troubleshooting are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).

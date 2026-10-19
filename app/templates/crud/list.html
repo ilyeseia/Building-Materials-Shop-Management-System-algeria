@@ -18,6 +18,9 @@
 {% block title %}{{ t(title_key) }}{% endblock %}
 {% block content %}
 <h1>{{ t(title_key) }}</h1>
+{% if list_intro is defined and list_intro %}
+<div class="notice">{{ t(list_intro) }}</div>
+{% endif %}
 
 <form method="get" action="{{ search_url }}" class="card no-print" id="list-filters">
   <div class="form-grid">

@@ -120,6 +120,7 @@
         {% if can('catalog.view') %}
           <div class="nav-group">{{ t('nav.catalog') }}</div>
           {{ nav_item(url_for('catalog.products'), t('product.title'), 'box') }}
+          {{ nav_item(url_for('catalog.market_prices'), t('market.title'), 'trend') }}
           {{ nav_item(url_for('catalog.categories'), t('product.categories'), 'grid') }}
           {{ nav_item(url_for('catalog.units'), t('unit.title'), 'ruler') }}
           {{ nav_item(url_for('catalog.warehouses'), t('stock.warehouses'), 'warehouse') }}

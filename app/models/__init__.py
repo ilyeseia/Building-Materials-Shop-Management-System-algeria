@@ -35,6 +35,10 @@ from app.models.catalog import (  # noqa: F401
     UnitOfMeasure,
 )
 from app.models.fleet import Carrier, Driver, Trip, TripExpense, Vehicle  # noqa: F401
+from app.models.market import (  # noqa: F401
+    MarketPrice,
+    MarketVerificationStatus,
+)
 from app.models.inventory import (  # noqa: F401
     StockAdjustment,
     StockAdjustmentLine,
@@ -82,6 +86,7 @@ __all__ = [
     "User", "Role", "ALL_ROLES", "ROLE_PERMISSIONS", "permissions_for",
     "Customer", "Supplier",
     "Category", "Brand", "Product", "ProductUnit", "ProductConversion", "UnitOfMeasure",
+    "MarketPrice", "MarketVerificationStatus",
     "Warehouse", "StockLevel", "StockMovement", "StockAdjustment", "StockAdjustmentLine",
     "StockTransfer", "StockTransferLine", "StockCount", "StockCountLine",
     "Quotation", "QuotationItem", "SalesOrder", "SalesOrderItem",

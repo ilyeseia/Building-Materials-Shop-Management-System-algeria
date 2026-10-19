@@ -117,6 +117,10 @@ class Config:
     QUANTITY_DECIMAL_PLACES = 3
     MONEY_DECIMAL_PLACES = 2
 
+    #: An observation older than this is displayed as "needs update".  This is
+    #: a display rule, not a stored judgement about the source.
+    MARKET_PRICE_STALE_DAYS = _int_env("MARKET_PRICE_STALE_DAYS", 30)
+
     # --- Feature modules (a business may switch these off) -----------
     FEATURE_WEIGHBRIDGE = _bool_env("FEATURE_WEIGHBRIDGE", True)
     FEATURE_FLEET = _bool_env("FEATURE_FLEET", True)

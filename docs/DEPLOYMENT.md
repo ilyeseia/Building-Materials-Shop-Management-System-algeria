@@ -256,27 +256,93 @@ docker volume ls | grep building-materials
 
 ## 8. Backup and restore
 
+### 8.1 Take a backup
+
 ```bash
-# Backup (safe while the shop is open: single-transaction dump)
+# Safe while the shop is open: MySQL single-transaction dump.
 docker compose exec app /app/scripts/backup.sh
 docker compose exec app ls -lh /app/backups
+```
 
-# Restore (destructive - the script requires typing YES then RESTORE)
+Each successful backup produces:
+
+| Artifact | Purpose |
+|---|---|
+| `bmshop-<UTC timestamp>-db.sql.gz` | consistent MySQL dump |
+| `bmshop-<UTC timestamp>-files.tar.gz` | `/app/instance` (generated PDFs and uploads) |
+| `bmshop-<UTC timestamp>.sha256` | checksums for both archives |
+| `bmshop-<UTC timestamp>.manifest.txt` | database name, schema revision, table count and restore commands |
+| `latest.json` | machine-readable status of the most recent successful backup |
+
+The script writes each archive to a temporary `.part` file, verifies the gzip
+stream, checks for mysqldump's `-- Dump completed` marker, then renames it.  A
+truncated run can therefore never be mistaken for a valid backup.  Retention is
+controlled by `BACKUP_RETENTION_DAYS` (default 30) and applies only to files
+whose names start with `bmshop-`.
+
+### 8.2 Verify a backup without touching production
+
+Run from the project directory on the host:
+
+```bash
+./scripts/verify-backup.sh                  # latest backup
+./scripts/verify-backup.sh <backup-name>    # a specific backup
+```
+
+The script verifies the checksum, creates a temporary database named
+`bmshop_verify_<timestamp>`, imports the dump, checks the table count,
+`alembic_version`, foreign keys, `mysqlcheck`, negative/over-reserved stock and
+overallocated payments, prints key row counts, and then drops the scratch
+database.  The live database is never opened for writes.  It is safe to run
+while the application is serving customers; because the shop can receive writes
+during the drill, the script does not compare live row counts with the restored
+copy.  For a byte-for-byte comparison, stop the application first.
+
+### 8.3 Restore
+
+The restore script **replaces** the database and files.  It now:
+
+1. requires the checksum file (unless `ALLOW_UNVERIFIED_BACKUP=1` is set for an
+   emergency);
+2. validates the files archive before changing anything;
+3. takes a fresh safety backup of the current database **and aborts if that
+   backup fails**;
+4. asks for `YES` and then `RESTORE`;
+5. imports the dump, compares the dump's `CREATE TABLE` count with the restored
+   table count, runs `mysqlcheck`, verifies `alembic_version` and checks for
+   negative stock;
+6. writes `restore-<timestamp>.report.txt` with the safety-backup name.
+
+```bash
 docker compose stop app
 docker compose run --rm --no-deps app /app/scripts/restore.sh <backup-name>
 docker compose up -d app
 ```
 
-Each backup produces a gzipped MySQL dump, a tarball of `/app/instance`, a
-`.sha256` file (verified automatically before a restore) and a manifest that
-records what was taken and when.
+If the restore fails, the printed report names the safety backup.  Restore that
+safety backup with the same procedure before investigating.
 
-Copy backups off the machine regularly - a backup that only exists on the server
-it protects is not a backup:
+### 8.4 Scheduled backups and off-site copies
+
+Schedule a daily backup from the host, for example with cron:
+
+```cron
+# 02:15 Africa/Algiers, log to the deploy user's home directory
+15 2 * * * cd /home/sysuser/apps/building-materials-shop && \
+  docker compose exec -T app /app/scripts/backup.sh >> /home/sysuser/bmshop-backup.log 2>&1
+```
+
+Then copy the backup archives to a different machine or object store.  A backup
+that only exists on the server it protects is not a backup:
 
 ```bash
-docker compose exec app tar -czf - -C /app/backups . > backups-$(date +%F).tar.gz
+docker compose exec -T app tar -czf - -C /app/backups . > backups-$(date +%F).tar.gz
+scp backups-$(date +%F).tar.gz backup-host:/srv/bmshop/
 ```
+
+Run `./scripts/verify-backup.sh` monthly and after every upgrade.  Backups are
+not encrypted by the script; store the off-site copy on encrypted storage and
+restrict access because the dump contains business and personal data.
 
 ---
 
