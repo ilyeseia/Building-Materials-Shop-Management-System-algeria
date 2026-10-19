@@ -216,11 +216,130 @@
     update();
   }
 
+  /* ----- Appearance: light / dark ---------------------------------------- */
+  function setupTheme() {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll("[data-theme-toggle]");
+    if (!buttons.length) return;
+
+    function render() {
+      var dark = root.getAttribute("data-theme") === "dark";
+      buttons.forEach(function (button) {
+        button.setAttribute("aria-pressed", dark ? "true" : "false");
+      });
+    }
+
+    buttons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        root.setAttribute("data-theme", next);
+        try { window.localStorage.setItem("bmshop-theme", next); } catch (error) { /* ignore */ }
+        render();
+      });
+    });
+
+    render();
+  }
+
+  /* ----- Mobile navigation drawer ---------------------------------------- */
+  function setupNav() {
+    var body = document.body;
+    var toggle = document.querySelector("[data-nav-toggle]");
+    if (!toggle) return;
+
+    function setOpen(open) {
+      body.classList.toggle("nav-open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    toggle.addEventListener("click", function () {
+      setOpen(!body.classList.contains("nav-open"));
+    });
+
+    document.querySelectorAll("[data-nav-close]").forEach(function (element) {
+      element.addEventListener("click", function () { setOpen(false); });
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") setOpen(false);
+    });
+
+    document.querySelectorAll(".sidebar .nav-link").forEach(function (link) {
+      link.addEventListener("click", function () {
+        if (window.matchMedia("(max-width: 1024px)").matches) setOpen(false);
+      });
+    });
+
+    window.addEventListener("resize", function () {
+      if (window.innerWidth > 1024) setOpen(false);
+    });
+  }
+
+  /* ----- Account menu (<details>) ---------------------------------------- */
+  function setupMenus() {
+    var menus = document.querySelectorAll("details.user-menu");
+    if (!menus.length) return;
+
+    document.addEventListener("click", function (event) {
+      menus.forEach(function (menu) {
+        if (menu.hasAttribute("open") && !menu.contains(event.target)) {
+          menu.removeAttribute("open");
+        }
+      });
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape") return;
+      menus.forEach(function (menu) { menu.removeAttribute("open"); });
+    });
+  }
+
+  /* ----- Dismissible flash messages -------------------------------------- */
+  function setupFlash() {
+    function dismiss(flash) {
+      flash.classList.add("is-hiding");
+      window.setTimeout(function () {
+        if (flash.parentNode) flash.parentNode.removeChild(flash);
+      }, 260);
+    }
+
+    document.querySelectorAll(".flash").forEach(function (flash) {
+      var close = flash.querySelector("[data-flash-close]");
+      if (close) {
+        close.addEventListener("click", function () { dismiss(flash); });
+      }
+      var autoHide = flash.classList.contains("success") ||
+        flash.classList.contains("message") ||
+        flash.classList.contains("info");
+      if (autoHide) {
+        window.setTimeout(function () { dismiss(flash); }, 8000);
+      }
+    });
+  }
+
+  /* ----- Horizontal scrolling for wide tables ---------------------------- */
+  function setupTables() {
+    document.querySelectorAll("table.data").forEach(function (table) {
+      if (table.closest(".document-sheet")) return;
+      var parent = table.parentElement;
+      if (parent && parent.classList.contains("table-wrap")) return;
+      var wrap = document.createElement("div");
+      wrap.className = "table-wrap";
+      parent.insertBefore(wrap, table);
+      wrap.appendChild(table);
+    });
+  }
+
   ready(function () {
     setupLines();
     setupConfirm();
     setupPrint();
     setupAutoSubmit();
     setupPaymentToggle();
+    setupTheme();
+    setupNav();
+    setupMenus();
+    setupFlash();
+    setupTables();
   });
 })();

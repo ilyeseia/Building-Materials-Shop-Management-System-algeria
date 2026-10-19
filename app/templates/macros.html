@@ -6,6 +6,32 @@
     by WTForms onto catalogue keys, so no English default text can reach the
     screen. -#}
 
+{#- Inline icon from the sprite in base.html (no external request). -#}
+{% macro icon(name, cls='') -%}
+<svg class="icon {{ cls }}" aria-hidden="true" focusable="false"><use href="#i-{{ name }}"></use></svg>
+{%- endmacro %}
+
+{#- Flash messages, translated and dismissible; also used by the login screen,
+    which replaces the application shell. -#}
+{% macro flashes() %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}" role="{{ 'alert' if category in ('danger', 'error') else 'status' }}">
+        <span>{{ message }}</span>
+        <button class="flash-close" type="button" data-flash-close aria-label="{{ t('action.close') }}">×</button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+{% endmacro %}
+
+{#- Friendly placeholder for an empty table or panel. -#}
+{% macro empty_state(message=None, icon_name='inbox') %}
+  <div class="empty">
+    {{ icon(icon_name) }}
+    <p>{{ message if message else t('common.no_results') }}</p>
+  </div>
+{% endmacro %}
+
 {% macro field(f) %}
   <div class="field">
     {{ f.label }}
@@ -62,7 +88,7 @@
     {% if result.has_prev %}
       <a class="btn small secondary" href="{{ base_url }}?{{ dict(filters, page=result.page - 1) | urlencode }}">{{ t('common.previous') }}</a>
     {% endif %}
-    <span class="small muted">{{ t('common.page') }} {{ result.page }} / {{ result.pages }}
+    <span class="page-info">{{ t('common.page') }} {{ result.page }} / {{ result.pages }}
       ({{ t('common.records') }}: {{ result.total }})</span>
     {% if result.has_next %}
       <a class="btn small secondary" href="{{ base_url }}?{{ dict(filters, page=result.page + 1) | urlencode }}">{{ t('common.next') }}</a>

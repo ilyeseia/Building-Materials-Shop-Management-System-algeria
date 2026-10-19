@@ -1,115 +1,244 @@
-{#- Base layout. Direction comes from the active language, so Arabic mirrors the
-    whole interface through the browser instead of duplicated CSS. -#}
+{% from "macros.html" import icon, flashes %}
+{#- Application shell.
+
+    * Direction comes from the active language, so Arabic mirrors the whole
+      interface through the browser instead of duplicated CSS.
+    * The page heading lives in the top bar (``self.title()``) and the copy in
+      the page body is hidden on screen, printed, and kept for assistive
+      technology through the top-bar <h1>.
+    * Assets are self-hosted; the only script in <head> applies the saved
+      theme before the first paint. -#}
+{% macro nav_item(url, label, icon_name, exact=False) -%}
+  {%- set current = (request.path.rstrip('/') or '/') -%}
+  {%- set target = (url.rstrip('/') or '/') -%}
+  {%- set active = (current == target) or ((not exact) and target != '/' and current.startswith(target ~ '/')) -%}
+  <a class="nav-link{{ ' active' if active }}" href="{{ url }}"{% if active %} aria-current="page"{% endif %}>{{ icon(icon_name) }}<span>{{ label }}</span></a>
+{%- endmacro %}
 <!doctype html>
 <html lang="{{ get_locale() }}" dir="{{ text_direction() }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b3229">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+  <script src="{{ url_for('static', filename='js/theme.js', v=3) }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=3) }}">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
+{#- Inline icon sprite: no external requests, so the strict CSP stays intact. -#}
+<svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <symbol id="i-building" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4h6v4"/><path d="M9 10h.01M15 10h.01M9 14h.01M15 14h.01"/></symbol>
+  <symbol id="i-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.2l2.2 11.2a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21 7H6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M9 13h6M9 17h6"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V2.5h6V4"/><path d="M9 11h6M9 15h4"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 6.5h12v9h-12z"/><path d="M13.5 10h4l3 3v2.5h-7"/><circle cx="5.5" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9 7h6M9 11h6M9 15h4"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 3h6l2-3h4"/><path d="M5 5h14l2 7v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6z"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></symbol>
+  <symbol id="i-check-square" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3.3 7.9L12 13l8.7-5.1"/><path d="M12 13v9"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17L17 3l4 4L7 21z"/><path d="M8 8l2 2M11 5l2 2M5 11l2 2M14 14l2 2"/></symbol>
+  <symbol id="i-warehouse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V10l9-6 9 6v11"/><path d="M7 21v-6h10v6"/><path d="M7 18h10"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/><path d="M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
+  <symbol id="i-briefcase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 8H5a2 2 0 0 1 0-4h13v4"/><path d="M3 6v13a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5"/><path d="M16.5 14h.01"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M6 21h12"/><path d="M5 7h14"/><path d="M5 7l-3 6a3 3 0 0 0 6 0z"/><path d="M19 7l-3 6a3 3 0 0 0 6 0z"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H14a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h6.5"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+  <symbol id="i-arrow-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17"/><path d="M17 17H7V7"/></symbol>
+  <symbol id="i-arrow-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 9v5M12 17h.01"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main-content">{{ t('common.skip') }}</a>
+
+{% block shell %}
+{% set path = request.path.rstrip('/') or '/' %}
 <div class="layout">
-  <aside class="sidebar no-print">
-    <span class="brand">{{ app_name }}</span>
+  <aside class="sidebar no-print" id="app-nav" aria-label="{{ t('nav.menu') }}">
+    <a class="brand" href="{{ url_for('dashboard.index') if current_user.is_authenticated else url_for('auth.login') }}">
+      <span class="brand-mark">{{ icon('building', 'icon-lg') }}</span>
+      <span class="brand-text">
+        <span class="brand-name">{{ app_name }}</span>
+        <span class="brand-sub">{{ t('app.tagline') }}</span>
+      </span>
+    </a>
+
     {% if current_user.is_authenticated %}
-    <nav>
-      {% if can('dashboard.view') %}<a href="{{ url_for('dashboard.index') }}">{{ t('nav.dashboard') }}</a>{% endif %}
-      {% if can('sales.view') %}
-        <div class="nav-group">{{ t('nav.sales') }}</div>
-        <a href="{{ url_for('sales.quotations') }}">{{ t('sale.quotations') }}</a>
-        <a href="{{ url_for('sales.orders') }}">{{ t('sale.orders') }}</a>
-        <a href="{{ url_for('sales.deliveries') }}">{{ t('sale.deliveries') }}</a>
-        <a href="{{ url_for('sales.invoices') }}">{{ t('sale.invoices') }}</a>
-        {% if can('sales.manage') %}<a href="{{ url_for('sales.direct_sale') }}">{{ t('sale.direct') }}</a>{% endif %}
-      {% endif %}
-      {% if can('purchasing.view') %}
-        <div class="nav-group">{{ t('nav.purchasing') }}</div>
-        <a href="{{ url_for('purchasing.orders') }}">{{ t('purchase.orders') }}</a>
-        <a href="{{ url_for('purchasing.receipts') }}">{{ t('purchase.receipts') }}</a>
-        <a href="{{ url_for('purchasing.invoices') }}">{{ t('purchase.supplier_invoices') }}</a>
-        <a href="{{ url_for('purchasing.returns') }}">{{ t('nav.returns') }}</a>
-      {% endif %}
-      {% if can('inventory.view') %}
-        <div class="nav-group">{{ t('nav.inventory') }}</div>
-        <a href="{{ url_for('inventory.levels') }}">{{ t('stock.levels') }}</a>
-        <a href="{{ url_for('inventory.movements') }}">{{ t('stock.ledger') }}</a>
-        <a href="{{ url_for('inventory.adjustments') }}">{{ t('stock.adjustments') }}</a>
-        <a href="{{ url_for('inventory.transfers') }}">{{ t('stock.transfers') }}</a>
-        <a href="{{ url_for('inventory.counts') }}">{{ t('stock.counts') }}</a>
-      {% endif %}
-      {% if can('catalog.view') %}
-        <div class="nav-group">{{ t('nav.catalog') }}</div>
-        <a href="{{ url_for('catalog.products') }}">{{ t('product.title') }}</a>
-        <a href="{{ url_for('catalog.categories') }}">{{ t('product.categories') }}</a>
-        <a href="{{ url_for('catalog.units') }}">{{ t('unit.title') }}</a>
-        <a href="{{ url_for('catalog.warehouses') }}">{{ t('stock.warehouses') }}</a>
-      {% endif %}
-      <div class="nav-group">{{ t('nav.parties') }}</div>
-      {% if can('customers.view') %}<a href="{{ url_for('parties.customers') }}">{{ t('nav.customers') }}</a>{% endif %}
-      {% if can('suppliers.view') %}<a href="{{ url_for('parties.suppliers') }}">{{ t('nav.suppliers') }}</a>{% endif %}
-      {% if can('payments.view') %}<a href="{{ url_for('finance.payments') }}">{{ t('nav.payments') }}</a>{% endif %}
-      {% if can('weigh.view') and modules is not defined or (modules is defined and modules.weighbridge) %}
-        {% if can('weigh.view') %}
-        <div class="nav-group">{{ t('nav.operations') }}</div>
-        <a href="{{ url_for('weighbridge.tickets') }}">{{ t('weigh.tickets') }}</a>
-        <a href="{{ url_for('weighbridge.devices') }}">{{ t('weigh.devices') }}</a>
+    <div class="nav-scroll">
+      <nav class="nav">
+        {% if can('dashboard.view') %}{{ nav_item(url_for('dashboard.index'), t('nav.dashboard'), 'dashboard') }}{% endif %}
+
+        {% if can('sales.view') %}
+          <div class="nav-group">{{ t('nav.sales') }}</div>
+          {{ nav_item(url_for('sales.quotations'), t('sale.quotations'), 'file') }}
+          {{ nav_item(url_for('sales.orders'), t('sale.orders'), 'clipboard') }}
+          {{ nav_item(url_for('sales.deliveries'), t('sale.deliveries'), 'truck') }}
+          {{ nav_item(url_for('sales.invoices'), t('sale.invoices'), 'receipt') }}
+          {% if can('sales.manage') %}{{ nav_item(url_for('sales.direct_sale'), t('sale.direct'), 'bolt') }}{% endif %}
         {% endif %}
-      {% endif %}
-      {% if can('fleet.view') %}
-        <a href="{{ url_for('fleet.trips') }}">{{ t('fleet.trips') }}</a>
-        <a href="{{ url_for('fleet.vehicles') }}">{{ t('fleet.vehicles') }}</a>
-        <a href="{{ url_for('fleet.drivers') }}">{{ t('fleet.drivers') }}</a>
-        <a href="{{ url_for('fleet.carriers') }}">{{ t('fleet.carriers') }}</a>
-      {% endif %}
-      {% if can('reports.view') %}
-        <div class="nav-group">{{ t('nav.reports') }}</div>
-        <a href="{{ url_for('reports.index') }}">{{ t('reports.title') }}</a>
-      {% endif %}
-      {% if can('settings.view') or can('users.view') or can('audit.view') %}
-        <div class="nav-group">{{ t('nav.admin') }}</div>
-        {% if can('settings.view') %}<a href="{{ url_for('settings.index') }}">{{ t('nav.settings') }}</a>{% endif %}
-        {% if can('users.view') or can('users.manage') %}<a href="{{ url_for('users.index') }}">{{ t('nav.users') }}</a>{% endif %}
-        {% if can('audit.view') %}<a href="{{ url_for('audit.index') }}">{{ t('nav.audit') }}</a>{% endif %}
-      {% endif %}
-    </nav>
+
+        {% if can('purchasing.view') %}
+          <div class="nav-group">{{ t('nav.purchasing') }}</div>
+          {{ nav_item(url_for('purchasing.orders'), t('purchase.orders'), 'clipboard') }}
+          {{ nav_item(url_for('purchasing.receipts'), t('purchase.receipts'), 'inbox') }}
+          {{ nav_item(url_for('purchasing.invoices'), t('purchase.supplier_invoices'), 'receipt') }}
+          {{ nav_item(url_for('purchasing.returns'), t('nav.returns'), 'rotate') }}
+        {% endif %}
+
+        {% if can('inventory.view') %}
+          <div class="nav-group">{{ t('nav.inventory') }}</div>
+          {{ nav_item(url_for('inventory.levels'), t('stock.levels'), 'layers', exact=True) }}
+          {{ nav_item(url_for('inventory.movements'), t('stock.ledger'), 'list') }}
+          {{ nav_item(url_for('inventory.adjustments'), t('stock.adjustments'), 'sliders') }}
+          {{ nav_item(url_for('inventory.transfers'), t('stock.transfers'), 'shuffle') }}
+          {{ nav_item(url_for('inventory.counts'), t('stock.counts'), 'check-square') }}
+        {% endif %}
+
+        {% if can('catalog.view') %}
+          <div class="nav-group">{{ t('nav.catalog') }}</div>
+          {{ nav_item(url_for('catalog.products'), t('product.title'), 'box') }}
+          {{ nav_item(url_for('catalog.categories'), t('product.categories'), 'grid') }}
+          {{ nav_item(url_for('catalog.units'), t('unit.title'), 'ruler') }}
+          {{ nav_item(url_for('catalog.warehouses'), t('stock.warehouses'), 'warehouse') }}
+        {% endif %}
+
+        {% if can('customers.view') or can('suppliers.view') %}
+          <div class="nav-group">{{ t('nav.parties') }}</div>
+          {% if can('customers.view') %}{{ nav_item(url_for('parties.customers'), t('nav.customers'), 'users') }}{% endif %}
+          {% if can('suppliers.view') %}{{ nav_item(url_for('parties.suppliers'), t('nav.suppliers'), 'briefcase') }}{% endif %}
+        {% endif %}
+
+        {% if can('payments.view') %}
+          <div class="nav-group">{{ t('nav.finance') }}</div>
+          {{ nav_item(url_for('finance.payments'), t('nav.payments'), 'wallet') }}
+        {% endif %}
+
+        {% if can('weigh.view') and (modules is not defined or modules.weighbridge) %}
+          <div class="nav-group">{{ t('nav.operations') }}</div>
+          {{ nav_item(url_for('weighbridge.tickets'), t('weigh.tickets'), 'scale') }}
+          {{ nav_item(url_for('weighbridge.devices'), t('weigh.devices'), 'cpu') }}
+        {% endif %}
+
+        {% if can('fleet.view') %}
+          <div class="nav-group">{{ t('nav.fleet') }}</div>
+          {{ nav_item(url_for('fleet.trips'), t('fleet.trips'), 'route') }}
+          {{ nav_item(url_for('fleet.vehicles'), t('fleet.vehicles'), 'truck') }}
+          {{ nav_item(url_for('fleet.drivers'), t('fleet.drivers'), 'user') }}
+          {{ nav_item(url_for('fleet.carriers'), t('fleet.carriers'), 'building') }}
+        {% endif %}
+
+        {% if can('reports.view') %}
+          <div class="nav-group">{{ t('nav.reports') }}</div>
+          {{ nav_item(url_for('reports.index'), t('reports.title'), 'chart') }}
+        {% endif %}
+
+        {% if can('settings.view') or can('users.view') or can('audit.view') %}
+          <div class="nav-group">{{ t('nav.admin') }}</div>
+          {% if can('settings.view') %}{{ nav_item(url_for('settings.index'), t('nav.settings'), 'settings') }}{% endif %}
+          {% if can('users.view') or can('users.manage') %}{{ nav_item(url_for('users.index'), t('nav.users'), 'users') }}{% endif %}
+          {% if can('audit.view') %}{{ nav_item(url_for('audit.index'), t('nav.audit'), 'shield') }}{% endif %}
+        {% endif %}
+      </nav>
+    </div>
     {% endif %}
+
+    <div class="sidebar-foot no-print">
+      {% if current_user.is_authenticated %}
+      <div class="lang-switch on-dark" role="group" aria-label="{{ t('common.language') }}">
+        {% for code, label in LANGUAGES.items() %}
+          <a class="lang-option{{ ' active' if code == get_locale() }}" href="{{ url_for('auth.language', code=code) }}" hreflang="{{ code }}" lang="{{ code }}">{{ label }}</a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <a class="btn small accent" href="{{ url_for('auth.login') }}">{{ t('auth.sign_in') }}</a>
+      {% endif %}
+    </div>
   </aside>
+
+  <div class="nav-scrim no-print" data-nav-close></div>
 
   <div class="main">
     <header class="topbar no-print">
-      <span class="muted small">{{ t('common.today') }}: {{ now_date() if now_date is defined else '' }}</span>
+      <button class="icon-btn nav-toggle" type="button" data-nav-toggle aria-controls="app-nav" aria-expanded="false" aria-label="{{ t('nav.menu') }}">{{ icon('menu') }}</button>
+
+      <div class="topbar-heading">
+        <span class="topbar-eyebrow">{{ app_name }}</span>
+        <h1 class="topbar-title">{{ self.title() }}</h1>
+      </div>
+
       <span class="spacer"></span>
-      {% if current_user.is_authenticated %}
-        <span class="small">{{ current_user.full_name or current_user.username }}
-          <span class="badge">{{ t('role.' + current_user.role) }}</span></span>
-        <a class="btn small ghost" href="{{ url_for('auth.change_password') }}">{{ t('auth.change_password') }}</a>
-        <form method="post" action="{{ url_for('auth.logout') }}" style="display:inline">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="btn small secondary" type="submit">{{ t('auth.sign_out') }}</button>
-        </form>
-      {% endif %}
-      <span class="small">
+
+      <span class="topbar-date">{{ icon('calendar') }}<span>{{ now_date() }}</span></span>
+
+      <div class="lang-switch" role="group" aria-label="{{ t('common.language') }}">
         {% for code, label in LANGUAGES.items() %}
-          <a href="{{ url_for('auth.language', code=code) }}"
-             {% if code == get_locale() %}style="font-weight:700"{% endif %}>{{ label }}</a>
-          {% if not loop.last %} · {% endif %}
+          <a class="lang-option{{ ' active' if code == get_locale() }}" href="{{ url_for('auth.language', code=code) }}" hreflang="{{ code }}" lang="{{ code }}"{% if code == get_locale() %} aria-current="true"{% endif %}>{{ label }}</a>
         {% endfor %}
-      </span>
+      </div>
+
+      <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="{{ t('common.theme') }}" aria-pressed="false">
+        <span class="icon-sun">{{ icon('sun') }}</span>
+        <span class="icon-moon">{{ icon('moon') }}</span>
+      </button>
+
+      {% if current_user.is_authenticated %}
+      <details class="user-menu">
+        <summary>
+          <span class="avatar" aria-hidden="true">{{ (current_user.full_name or current_user.username)[:2] | upper }}</span>
+          <span class="user-meta">
+            <span class="user-name">{{ current_user.full_name or current_user.username }}</span>
+            <span class="user-role">{{ t('role.' + current_user.role) }}</span>
+          </span>
+          <span class="user-chevron">{{ icon('chevron-down') }}</span>
+        </summary>
+        <div class="menu">
+          <div class="menu-head">
+            <strong>{{ current_user.full_name or current_user.username }}</strong>
+            <span class="small muted">{{ current_user.username }} — {{ t('role.' + current_user.role) }}</span>
+          </div>
+          <a class="menu-item" href="{{ url_for('auth.change_password') }}">{{ icon('lock') }}<span>{{ t('auth.change_password') }}</span></a>
+          <form method="post" action="{{ url_for('auth.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="menu-item danger" type="submit">{{ icon('logout') }}<span>{{ t('auth.sign_out') }}</span></button>
+          </form>
+        </div>
+      </details>
+      {% else %}
+      <a class="btn small" href="{{ url_for('auth.login') }}">{{ t('auth.sign_in') }}</a>
+      {% endif %}
     </header>
 
-    <main class="content">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            <div class="flash {{ category }}">{{ message }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
+    <main class="content" id="main-content">
+      {{ flashes() }}
       {% block content %}{% endblock %}
     </main>
   </div>
 </div>
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}
+
+<script src="{{ url_for('static', filename='js/app.js', v=3) }}"></script>
 </body>
 </html>

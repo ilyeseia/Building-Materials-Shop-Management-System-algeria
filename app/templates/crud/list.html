@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import pagination %}
+{% from "macros.html" import pagination, empty_state %}
 {#-
   Generic, data-driven list screen.
 
@@ -72,7 +72,7 @@
     </tbody>
   </table>
   {% else %}
-  <p class="muted">{{ t('common.no_results') }}</p>
+  {{ empty_state(t('common.no_results'), 'search') }}
   {% endif %}
 </div>
 

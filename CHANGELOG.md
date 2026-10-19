@@ -90,6 +90,13 @@ existing deployment is not surprised, but replaces the internals.
 
 ### Changed
 
+* **Redesigned user interface** (`app/static/css/app.css`, `templates/base.html`,
+  `dashboard.html`, `auth/login.html`): new pine/copper design system, sticky
+  top bar, grouped icon sidebar, responsive mobile drawer, light/dark themes
+  persisted in `localStorage`, redesigned dashboard with KPI cards and a
+  server-rendered sales chart, and refreshed tables, forms, login and error
+  pages.  All existing screens inherit the new components; no CDN assets and
+  the strict CSP are unchanged.
 * Money and quantities are `Numeric`/`Decimal` columns, not `REAL`/`float` and
   not integers.
 * Oversell prevention is a conditional SQL `UPDATE ... WHERE quantity -
