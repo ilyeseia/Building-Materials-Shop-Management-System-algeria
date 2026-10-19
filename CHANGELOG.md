@@ -136,6 +136,12 @@ existing deployment is not surprised, but replaces the internals.
   refused: the policy message was translated with the request-bound locale.
   CLI output is now translated with an explicit language, so the operator sees
   `Password rejected: <reason>` and a non-zero exit code — never a traceback.
+* Three password-policy messages had no entry in the catalogues
+  (`auth.password_too_weak`, `auth.password_needs_digit`,
+  `auth.password_needs_letter`), so the interface showed the raw key instead of
+  a sentence.  All three now exist in Arabic, French and English, and
+  `tests/test_i18n.py` drives the policy to prove that every key it can return
+  is translated.
 
 ### Not done yet
 

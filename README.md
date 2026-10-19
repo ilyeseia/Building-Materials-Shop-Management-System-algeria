@@ -124,7 +124,7 @@ to a default.
 ## Tests
 
 ```bash
-pytest -q                 # 191 tests
+pytest -q                 # 194 tests
 pytest -q tests/test_health.py tests/test_cli.py
 ```
 
@@ -140,7 +140,7 @@ database upgrade path. Evidence, including what is *not* covered, is in
 
 | Environment | What was verified | Result |
 |---|---|---|
-| Ubuntu 24.04.3, Python 3.12.3 | `pytest -q` (whole suite) | **191 passed** |
+| Ubuntu 24.04.3, Python 3.12.3 | `pytest -q` (whole suite) | **194 passed** |
 | Ubuntu 24.04.3, Docker 29.2.0, Compose v5.0.2 | `docker compose config --quiet`, `docker compose build` | ok |
 | MySQL 8.0.46 container | `flask db upgrade` + `flask init-db`, 50 tables, reference data seeded | ok |
 | Running stack | `GET /healthz` (200 + `database:true`), `GET /login` (200), `GET /` (302 → sign-in) | ok |

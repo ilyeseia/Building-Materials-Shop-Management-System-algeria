@@ -96,7 +96,13 @@ def register_cli(app) -> None:
             raise click.ClickException(f"No such user: {username}")
         errors = password_policy_errors(password, username=username)
         if errors:
-            raise click.ClickException("Password rejected: " + ", ".join(errors))
+            from app.i18n import translate
+
+            # Explicit language: a CLI command has no request context.
+            raise click.ClickException(
+                "Password rejected: "
+                + "; ".join(translate(key, language="en") for key in errors)
+            )
         user.set_password(password)
         db.session.commit()
         click.echo(f"Password updated for '{username}'.")

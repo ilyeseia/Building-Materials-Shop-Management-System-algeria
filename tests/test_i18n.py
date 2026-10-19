@@ -148,6 +148,32 @@ def test_application_code_only_uses_existing_keys():
     assert not problems, f"missing translation keys: {problems}"
 
 
+def test_password_policy_keys_are_all_translated():
+    """The policy *returns* catalogue keys, so the scan above cannot see them.
+
+    A key missing from a catalogue is shown to the user verbatim
+    (``auth.password_too_weak``) instead of a sentence — exactly what happened
+    with the four keys below before this test existed.
+    """
+    from app.security import password_policy_errors
+
+    produced: set[str] = set()
+    for candidate, username in (
+        ("short", "someone"),
+        ("password", "someone"),
+        ("changeme", "someone"),
+        ("onlyletters", "someone"),
+        ("12345678", "someone"),
+        ("admin-shop", "admin"),
+    ):
+        produced.update(password_policy_errors(candidate, username=username))
+
+    assert produced, "the policy produced no keys for these inputs"
+    for language, catalogue in CATALOGUES.items():
+        missing = sorted(key for key in produced if key not in catalogue)
+        assert not missing, f"{language} is missing {missing}"
+
+
 def test_wilaya_names_are_available_in_all_languages():
     for language in ("ar", "fr", "en"):
         assert wilaya_name(19, language)  # Sétif

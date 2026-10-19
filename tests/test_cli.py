@@ -49,3 +49,29 @@ def test_create_user_refuses_a_duplicate_username(app, runner, admin_user):
 
     assert result.exit_code != 0
     assert "already exists" in result.output
+
+
+def test_reset_password_reports_the_policy_reason_in_plain_language(app, runner, admin_user):
+    result = runner.invoke(
+        args=["reset-password", "--username", admin_user.username],
+        input="azerty\nazerty\n",
+    )
+
+    assert result.exit_code != 0
+    assert "Password rejected" in result.output
+    # Readable reasons, never the internal catalogue keys or a traceback.
+    assert "auth.password" not in result.output
+    assert "Traceback" not in result.output
+
+
+def test_reset_password_updates_the_stored_hash(app, runner, admin_user):
+    result = runner.invoke(
+        args=["reset-password", "--username", admin_user.username],
+        input="Chantier-2026\nChantier-2026\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Password updated" in result.output
+    db.session.refresh(admin_user)
+    assert admin_user.check_password("Chantier-2026")
+    assert not admin_user.check_password("Tester-Pass-123")
