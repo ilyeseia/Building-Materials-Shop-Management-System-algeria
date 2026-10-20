@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, flashes, field, checkbox %}
+{% block title %}{{ t(title_key) }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ t(title_key) }}</h1>
+</div>
+
+{{ flashes() }}
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>{{ t('users.totp_setup') }}</h2>
+    {% if totp_enabled %}
+      <div class="alert success">
+        {{ icon('check-circle') }} {{ t('users.totp_enabled') }}
+      </div>
+      <form method="post" class="form" onsubmit="return confirm('{{ t('users.confirm_disable_totp') }}');">
+        <input type="hidden" name="action" value="disable_totp">
+        <button type="submit" class="btn danger">{{ icon('shield-off') }} {{ t('users.disable_totp') }}</button>
+      </form>
+    {% else %}
+      {% if qr_code %}
+        <div class="totp-setup">
+          <p>{{ t('users.totp_instructions') }}</p>
+          <div class="qr-code">
+            <img src="data:image/png;base64,{{ qr_code }}" alt="TOTP QR Code">
+          </div>
+          <p class="muted small">{{ t('users.totp_secret_label') }} <code>{{ session.get('_totp_secret_display', '••••••••••••••••') }}</code></p>
+        </div>
+        <form method="post" class="form">
+          <input type="hidden" name="action" value="verify_totp">
+          {{ field(form.totp_code) if form is defined else '' }}
+          <input type="text" name="totp_code" placeholder="{{ t('auth.totp_code') }}" required maxlength="6" pattern="\d{6}" class="input" style="text-align:center; letter-spacing: 0.5em;">
+          <button type="submit" class="btn primary">{{ icon('check') }} {{ t('auth.verify') }}</button>
+        </form>
+        {% if backup_codes %}
+          <div class="backup-codes">
+            <h4>{{ t('users.backup_codes') }}</h4>
+            <p class="muted small">{{ t('users.backup_codes_warning') }}</p>
+            <div class="code-grid">
+              {% for code in backup_codes %}
+                <code>{{ code }}</code>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      {% else %}
+        <form method="post" class="form">
+          <input type="hidden" name="action" value="enable_totp">
+          <button type="submit" class="btn primary">{{ icon('shield') }} {{ t('users.enable_totp') }}</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>{{ t('users.active_sessions') }}</h2>
+    <form method="post" class="form" style="margin-bottom: 1rem;">
+      <input type="hidden" name="action" value="revoke_all">
+      <button type="submit" class="btn secondary" onclick="return confirm('{{ t('users.confirm_revoke_all') }}');">
+        {{ icon('log-out') }} {{ t('users.revoke_all_sessions') }}
+      </button>
+    </form>
+    {% if sessions %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{{ t('users.session_id') }}</th>
+              <th>{{ t('users.ip') }}</th>
+              <th>{{ t('users.user_agent') }}</th>
+              <th>{{ t('users.created') }}</th>
+              <th>{{ t('users.last_activity') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sessions %}
+            <tr>
+              <td>{{ s.session_key[:12] }}...</td>
+              <td>{{ s.ip_address or '—' }}</td>
+              <td>{{ (s.user_agent or '—')[:40] }}</td>
+              <td>{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td>{{ s.last_activity_at.strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">{{ t('users.no_active_sessions') }}</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

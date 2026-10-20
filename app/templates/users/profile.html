@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, flashes, field, checkbox %}
+{% block title %}{{ t(title_key) }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ t(title_key) }}</h1>
+</div>
+
+{{ flashes() }}
+
+<div class="grid grid-2">
+  <section class="card">
+    <h2>{{ t('users.profile_info') }}</h2>
+    <form method="post" class="form">
+      {{ form.hidden_tag() }}
+      {{ field(form.username) }}
+      {{ field(form.full_name) }}
+      {{ field(form.email) }}
+      {{ field(form.phone) }}
+      {{ field(form.language) }}
+      {{ field(form.branch_id) }}
+      {{ field(form.password) }}
+      <div class="form-actions">
+        {{ form.submit(class_='btn primary') }}
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>{{ t('users.sessions_title') }}</h2>
+    {% if sessions %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{{ t('users.session_id') }}</th>
+              <th>{{ t('users.ip') }}</th>
+              <th>{{ t('users.created') }}</th>
+              <th>{{ t('users.last_activity') }}</th>
+              <th>{{ t('common.active') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sessions %}
+            <tr>
+              <td>{{ s.session_key[:12] }}...</td>
+              <td>{{ s.ip_address or '—' }}</td>
+              <td>{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td>{{ s.last_activity_at.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td>{% if s.is_active %}{{ t('common.yes') }}{% else %}{{ t('common.no') }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <a href="{{ url_for('users.profile_security') }}" class="btn secondary">
+        {{ icon('shield') }} {{ t('users.security_title') }}
+      </a>
+    {% else %}
+      <p class="muted">{{ t('users.no_active_sessions') }}</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

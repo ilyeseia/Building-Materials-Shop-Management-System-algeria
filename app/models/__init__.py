@@ -82,7 +82,17 @@ from app.models.sales import (  # noqa: F401
     SalesOrder,
     SalesOrderItem,
 )
-from app.models.security import ALL_ROLES, ROLE_PERMISSIONS, Role, User, permissions_for  # noqa: F401
+from app.models.security import (
+    AccountStatus,
+    ALL_ROLES,
+    PasswordResetToken,
+    Role,
+    RoleDefinition,
+    ROLE_PERMISSIONS,
+    User,
+    UserSession,
+    permissions_for,
+)  # noqa: F401
 from app.models.weighbridge import (  # noqa: F401
     WeighbridgeDevice,
     WeighingCorrection,
@@ -90,7 +100,8 @@ from app.models.weighbridge import (  # noqa: F401
 )
 
 __all__ = [
-    "User", "Role", "ALL_ROLES", "ROLE_PERMISSIONS", "permissions_for",
+    "User", "Role", "RoleDefinition", "UserSession", "PasswordResetToken",
+    "AccountStatus", "ALL_ROLES", "ROLE_PERMISSIONS", "permissions_for",
     "Customer", "Supplier",
     "Category", "Brand", "Product", "ProductUnit", "ProductConversion", "UnitOfMeasure",
     "MarketPrice", "MarketVerificationStatus",

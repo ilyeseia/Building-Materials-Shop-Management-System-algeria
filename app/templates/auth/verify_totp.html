@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, flashes, field, checkbox %}
+{% block title %}{{ t('auth.totp_title') }}{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block shell %}
+<div class="auth-shell">
+  <aside class="auth-aside">
+    <div class="auth-brand-row">
+      <span class="brand-mark">{{ icon('building', 'icon-lg') }}</span>
+      <div class="auth-brand-text">
+        <strong>{{ app_name }}</strong>
+        <span>{{ t('app.tagline') }}</span>
+      </div>
+    </div>
+
+    <div class="auth-pitch">
+      <p class="auth-tagline">{{ t('auth.hero_title') }}</p>
+      <ul class="auth-points">
+        <li>{{ icon('layers') }}<span>{{ t('auth.point_stock') }}</span></li>
+        <li>{{ icon('receipt') }}<span>{{ t('auth.point_dzd') }}</span></li>
+        <li>{{ icon('chart') }}<span>{{ t('auth.point_languages') }}</span></li>
+      </ul>
+    </div>
+
+    <div class="auth-aside-foot">{{ now_date() }}</div>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-top">
+      <div class="lang-switch" role="group" aria-label="{{ t('common.language') }}">
+        {% for code, label in LANGUAGES.items() %}
+          <a class="lang-option{{ ' active' if code == get_locale() }}" href="{{ url_for('auth.language', code=code) }}" hreflang="{{ code }}" lang="{{ code }}"{% if code == get_locale() %} aria-current="true"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </div>
+      <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="{{ t('common.theme') }}" aria-pressed="false">
+        <span class="icon-sun">{{ icon('sun') }}</span>
+        <span class="icon-moon">{{ icon('moon') }}</span>
+      </button>
+    </div>
+
+    <div class="auth-card">
+      <div class="auth-mark">{{ icon('shield-check', 'icon-lg') }}</div>
+      <div class="auth-card-head">
+        <h1>{{ t('auth.totp_title') }}</h1>
+        <p class="muted">{{ t('auth.totp_subtitle') }}</p>
+      </div>
+
+      {{ flashes() }}
+
+      <form method="post" class="auth-form">
+        {{ form.hidden_tag() }}
+        {{ field(form.totp_code) }}
+        {{ form.submit(class_='btn lg btn-block') }}
+      </form>
+    </div>
+  </main>
+</div>
+{% endblock %}

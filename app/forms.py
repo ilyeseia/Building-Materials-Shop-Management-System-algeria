@@ -108,6 +108,24 @@ class LoginForm(BaseForm):
     submit = SubmitField("auth.sign_in")
 
 
+class TOTPForm(BaseForm):
+    """TOTP verification for MFA."""
+    totp_code = StringField("auth.totp_code", validators=[DataRequired(), Length(min=6, max=6)])
+    submit = SubmitField("auth.verify")
+
+
+class RoleForm(BaseForm):
+    """Custom role definition form."""
+    code = StringField("users.role_code", validators=[DataRequired(), Length(max=40)])
+    name_ar = StringField("common.name_ar", validators=[DataRequired(), Length(max=120)])
+    name_fr = StringField("common.name_fr", validators=[DataRequired(), Length(max=120)])
+    name_en = StringField("common.name_en", validators=[DataRequired(), Length(max=120)])
+    description = TextAreaField("common.description", validators=[Optional()])
+    permissions = TextAreaField("users.permissions", validators=[Optional()],
+                                 render_kw={"rows": 8, "placeholder": "users.view\nusers.create\nusers.update\n..."})
+    submit = SubmitField("common.save")
+
+
 class AIQuestionForm(BaseForm):
     """One question for the read-only AI workspace."""
 
@@ -418,10 +436,18 @@ class CountForm(BaseForm):
 class UserForm(BaseForm):
     username = StringField("auth.username", validators=[DataRequired(), Length(max=50)])
     full_name = StringField("common.name", validators=[Optional(), Length(max=120)])
+    email = StringField("common.email", validators=[Optional(), Email(), Length(max=120)])
     role = SelectField("users.role", choices=[(role, f"role.{role}") for role in sorted(ALL_ROLES)])
+    branch_id = SelectField("inventory.warehouse", coerce=int, choices=[], validate_choice=False)
+    status = SelectField("users.status", choices=[
+        ("active", "active"),
+        ("inactive", "inactive"),
+        ("suspended", "suspended"),
+    ])
     phone = StringField("common.phone", validators=[Optional(), Length(max=30)])
     language = SelectField("common.language", choices=[("", "—"), ("ar", "العربية"), ("fr", "Français"), ("en", "English")])
     is_active = BooleanField("common.active", default=True)
+    must_change_password = BooleanField("auth.must_change_password", default=False)
     password = PasswordField("auth.password", validators=[Optional(), Length(min=8)])
     submit = SubmitField("common.save")
 

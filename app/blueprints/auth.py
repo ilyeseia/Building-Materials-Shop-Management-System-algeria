@@ -6,9 +6,9 @@ from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import select
 
 from app.extensions import db
-from app.forms import ChangePasswordForm, LoginForm
+from app.forms import ChangePasswordForm, LoginForm, TOTPForm
 from app.i18n import set_locale, translate
-from app.models import User
+from app.models import AccountStatus, User
 from app.blueprints.helpers import current_user_id
 from app.security import (
     login_limited,
@@ -17,6 +17,7 @@ from app.security import (
     safe_next_url,
 )
 from app.services import audit
+from app.services.session_mgr import SessionManager
 from app.services.timeutil import utcnow
 
 bp = Blueprint("auth", __name__)
@@ -40,32 +41,127 @@ def login():
         user = db.session.execute(
             select(User).filter_by(username=username)
         ).scalars().first()
+
+        # Generic error message to avoid user enumeration
         if user is None or not user.check_password(form.password.data or ""):
             audit.record_login_event(username, False, "bad credentials")
             db.session.commit()
             flash(translate("auth.invalid_credentials"), "danger")
             return render_template("auth/login.html", form=form), 401
-        if not user.is_active:
-            audit.record_login_event(username, False, "inactive")
+
+        # Check account lockout
+        if user.is_locked:
+            audit.record_login_event(username, False, "account locked")
+            db.session.commit()
+            flash(translate("auth.account_locked"), "danger")
+            return render_template("auth/login.html", form=form), 403
+
+        # Check account status
+        if not user.is_active or user.status != AccountStatus.ACTIVE:
+            audit.record_login_event(username, False, f"inactive status: {user.status}")
             db.session.commit()
             flash(translate("auth.account_disabled"), "danger")
             return render_template("auth/login.html", form=form), 403
 
-        login_user(user, remember=bool(form.remember.data))
-        user.last_login_at = utcnow()
+        # Check TOTP MFA
+        if user.totp_enabled:
+            # Store user ID in session for TOTP verification step
+            session["pre_2fa_user_id"] = user.id
+            return redirect(url_for("auth.verify_totp"))
+
+        # Record successful login
+        user.record_login_success()
         reset_login_limit(username)
+
+        # Create session record with a generated session key
+        import secrets
+        session_key = session.get("_session_key") or secrets.token_hex(16)
+        session["_session_key"] = session_key
+        SessionManager.create_session(
+            user_id=user.id,
+            session_key=session_key,
+            ip_address=request.remote_addr,
+            user_agent=request.user_agent.string if request.user_agent else None,
+        )
+
+        login_user(user, remember=bool(form.remember.data))
         audit.record_login_event(username, True)
         db.session.commit()
+
         if user.language:
             set_locale(user.language)
+
+        # Check if password change is required
+        if user.must_change_password:
+            return redirect(url_for("auth.change_password"))
+
         return redirect(safe_next_url())
 
     return render_template("auth/login.html", form=form)
 
 
+@bp.route("/verify-totp", methods=["GET", "POST"])
+def verify_totp():
+    """Verify TOTP code for MFA."""
+    user_id = session.get("pre_2fa_user_id")
+    if not user_id:
+        return redirect(url_for("auth.login"))
+
+    user = db.session.get(User, user_id)
+    if not user or not user.totp_enabled:
+        session.pop("pre_2fa_user_id", None)
+        return redirect(url_for("auth.login"))
+
+    form = TOTPForm()
+    if form.validate_on_submit():
+        import pyotp
+        totp = pyotp.TOTP(user.totp_secret)
+        if totp.verify(form.totp_code.data, valid_window=1):
+            # Valid TOTP code
+            session.pop("pre_2fa_user_id", None)
+
+            # Record successful login
+            user.record_login_success()
+            reset_login_limit(user.username)
+
+            # Create session record with a generated session key
+            import secrets
+            session_key = session.get("_session_key") or secrets.token_hex(16)
+            session["_session_key"] = session_key
+            SessionManager.create_session(
+                user_id=user.id,
+                session_key=session_key,
+                ip_address=request.remote_addr,
+                user_agent=request.user_agent.string if request.user_agent else None,
+            )
+
+            login_user(user, remember=False)
+            audit.record_login_event(user.username, True)
+            db.session.commit()
+
+            if user.language:
+                set_locale(user.language)
+
+            # Check if password change is required
+            if user.must_change_password:
+                return redirect(url_for("auth.change_password"))
+
+            return redirect(safe_next_url())
+        else:
+            audit.record_login_event(user.username, False, "invalid totp")
+            db.session.commit()
+            flash(translate("auth.invalid_totp"), "danger")
+
+    return render_template("auth/verify_totp.html", form=form)
+
+
 @bp.route("/logout", methods=["GET", "POST"])
 @login_required
 def logout():
+    # Revoke the current session
+    session_key = session.get("_session_key")
+    if session_key:
+        SessionManager.revoke_session(session_key)
     audit.record("logout", "user", current_user_id(), summary=current_user.username)
     username = current_user.username
     logout_user()
@@ -89,6 +185,8 @@ def change_password():
                 flash(translate(key), "danger")
             return render_template("auth/password.html", form=form), 400
         current_user.set_password(form.new_password.data)
+        # Revoke all other sessions on password change
+        SessionManager.revoke_all_sessions(current_user.id, except_session=session.sid)
         audit.record("password_changed", "user", current_user.id, summary=current_user.username)
         db.session.commit()
         flash(translate("auth.password_changed"), "success")

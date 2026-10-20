@@ -118,3 +118,78 @@ Before calling the release deployed:
 - [x] Final statuses updated with the deployed commit and revision.
 
 Anything left unchecked above is **not** claimed as complete.
+
+---
+
+## 5. Enterprise IAM Subsystem (NEW - in development, not yet deployed)
+
+### Backend - DONE
+
+* **User lifecycle extensions** (migration `c3d4e5f6a7b8`):
+  - Email, branch assignment, account status (active/inactive/suspended/locked/pending)
+  - Failed login counter, lockout timestamp, forced password change flag
+  - TOTP secret + enabled flag, backup codes, last password change, deactivation timestamp
+
+* **New models:**
+  - `UserSession` — active/inactive session tracking with IP, user-agent, timestamps
+  - `PasswordResetToken` — secure, time-limited reset tokens (one-time use)
+  - `RoleDefinition` — custom roles with granular permissions (stored as JSON)
+  - `AccountStatus` enum — lifecycle states
+
+* **Services:**
+  - `IAMService` — dynamic permission evaluation, custom role CRUD, role listing
+  - `UserManagement` — create/activate/deactivate/change-role/change-password with audit
+  - `SessionManager` — create/revoke/list sessions, bulk revoke with exception
+
+* **Authentication blueprint** (`/auth`):
+  - Login with rate limiting, account lockout after 5 failures (15 min)
+  - TOTP MFA verification, password change enforcement
+  - Language selection (persisted in session)
+
+* **User management blueprint** (`/users`):
+  - List/create/edit with custom roles in dropdown
+  - Bulk activate/deactivate/change-role actions
+
+### Frontend - DONE
+
+* **Role & Permission Administration** (`/users/roles`):
+  - List all roles (system + custom) with permission counts
+  - Create/edit custom roles with multi-select permissions textarea
+  - Custom roles appear in user create/edit forms
+
+* **Active Sessions Management** (`/users/<id>/sessions`):
+  - View all sessions for a user with IP, user-agent, timestamps
+  - Revoke individual sessions (audited)
+
+* **Self-Service Profile** (`/profile`):
+  - Update name, email, phone, language (role/status/username locked)
+  - Change own password with policy validation
+
+* **Security Settings** (`/profile/security`):
+  - TOTP setup with QR code and 10 backup codes
+  - Verify TOTP to enable 2FA, disable 2FA (clears secret/codes)
+  - Revoke all other sessions (current session preserved)
+
+* **Audit Log** (`/audit`):
+  - Uses existing audit blueprint with filters (action, entity, actor, date range)
+
+### AI Workspace IAM Integration - DONE
+
+* Tools filtered by `IAMService.user_has_permission()` (dynamic + custom roles)
+* Server-side re-check in `execute_tool()` before every tool call
+* Custom roles with `dashboard.view` + `ai.view` get only `business_overview` tool
+
+### Tests - DONE
+
+* **257 tests pass** (229 existing + 28 new IAM frontend tests)
+* IAM backend test script validates all core logic
+* AI IAM test validates tool filtering and execution permissions
+
+### Remaining for IAM deployment
+
+| Item | Status |
+|---|---|
+| MySQL scratch migration `c3d4e5f6a7b8` validation | NOT TESTED |
+| Playwright UI verification for new IAM pages | NOT TESTED |
+| Production migration and deployment | BLOCKED |
+| Documentation update | IN PROGRESS |
