@@ -389,12 +389,17 @@ html[data-theme="dark"] ::selection {
 }
 
 .brand-name {
+  display: -webkit-box;
   overflow: hidden;
   color: #ffffff;
   font-size: 0.95rem;
   font-weight: 700;
-  white-space: nowrap;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: break-word;
   text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .brand-sub {

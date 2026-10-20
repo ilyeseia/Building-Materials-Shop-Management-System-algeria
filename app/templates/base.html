@@ -22,8 +22,8 @@
   <meta name="theme-color" content="#0b3229">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
-  <script src="{{ url_for('static', filename='js/theme.js', v=3) }}"></script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=3) }}">
+  <script src="{{ url_for('static', filename='js/theme.js', v=4) }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=4) }}">
 </head>
 <body class="{% block body_class %}{% endblock %}">
 {#- Inline icon sprite: no external requests, so the strict CSP stays intact. -#}
