@@ -49,8 +49,7 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_index("ix_ai_interactions_status", table_name="ai_interactions")
-    op.drop_index("ix_ai_interactions_user_id", table_name="ai_interactions")
-    op.drop_index("ix_ai_interactions_created_at", table_name="ai_interactions")
+    # Dropping the table removes its indexes and the user_id foreign key.  Do not
+    # drop the indexes first: MySQL refuses to drop an index that backs an FK.
     op.drop_table("ai_interactions")
     op.drop_column("business_settings", "enable_ai")

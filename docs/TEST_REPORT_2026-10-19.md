@@ -129,8 +129,14 @@ verified the removal of a per-invoice N+1:
 | Sales invoice list | 139 queries, 127 ms p50 | **4 queries, 17 ms p50** |
 | Local AI overview | 979 ms p50 | **94 ms p50** |
 
+The same volumes were also measured on a disposable **MySQL 8.0.46** database on
+the production host: dashboard **16 queries / 130.6 ms p50 / 133.8 ms p95**,
+receivables **4 / 147.3 / 160.4 ms**, sales list **4 / 24.8 / 28.4 ms**, local AI
+overview **124.9 ms p50**.  The query counts match SQLite, confirming the fix is
+not SQLite-only.  Report: `docs/PERFORMANCE_REPORT_MYSQL_2026-10-19.json`.
+
 Details, method and caveats are in `docs/PERFORMANCE.md`.  This is **not** a
-MySQL or concurrent-load result; MySQL capacity remains **PARTIAL / NOT TESTED**.
+concurrent-load result; capacity remains **PARTIAL / NOT TESTED** for concurrency.
 
 ## 3. Backup and restore
 

@@ -1,7 +1,7 @@
 # Performance report and method
 
-Status: **PARTIAL — measured on a synthetic SQLite scratch database; a MySQL
-scratch run is still required before quoting production capacity.**
+Status: **PARTIAL — measured on synthetic SQLite and MySQL scratch databases;
+not a concurrent load test or a production capacity test.**
 
 This report records a real measurement, including the defect it found. It does
 not claim production throughput from a test client.
@@ -82,9 +82,40 @@ Same database, same volumes, 8 iterations:
 The remaining dashboard time is mostly aggregation over 1,000 invoices and the
 low-stock query; it is a candidate for further indexing, not a correctness issue.
 
+## 5. MySQL scratch run
+
+The same workload was executed against a disposable **MySQL 8.0.46** database on
+the production host.  The database was created only for this test, migrated
+through `b2c3d4e5f6a7`, then reset and seeded by the benchmark.  It was dropped
+after the run.  The report is
+`docs/PERFORMANCE_REPORT_MYSQL_2026-10-19.json`.
+
+Environment: MySQL 8.0.46 in Docker, Python 3.13.16, 300 products / 500
+customers / 1,000 invoices, 8 iterations, 2 warm-up iterations, database size
+3.88 MB, 52 tables.  The image was built from commit `a1d9239`.  The JSON's
+`commit` field says `unknown` because the one-off `docker compose run` did not
+receive the build-argument environment; the image labels carry the commit.
+
+| Page | p50 | p95 | SQL statements |
+|---|---:|---:|---:|
+| `/` dashboard | 130.6 ms | 133.8 ms | 16 |
+| `/catalog/products` | 22.8 ms | 23.4 ms | 5 |
+| `/inventory` | 21.4 ms | 21.8 ms | 3 |
+| `/sales/invoices` | 24.8 ms | 28.4 ms | 4 |
+| `/finance/payments` | 17.3 ms | 18.4 ms | 2 |
+| `/reports/receivables` | 147.3 ms | 160.4 ms | 4 |
+| `/reports/stock` | 49.9 ms | 51.5 ms | 3 |
+| `/ai` (page) | 5.0 ms | 5.0 ms | 1 |
+| `service:ai_local_overview` | 124.9 ms | 126.4 ms | — |
+
+The query counts are identical to SQLite, which confirms the N+1 fix is not a
+SQLite-only effect.  MySQL latency is higher for the dashboard and receivables
+because the aggregation runs in the database over 1,000 rows and their lines;
+the absolute values still exclude network, TLS, proxy and browser time.
+
 ---
 
-## 5. How to reproduce
+## 6. How to reproduce
 
 SQLite scratch:
 
@@ -109,11 +140,12 @@ to run without `BENCHMARK_CONFIRM=1`.
 
 ---
 
-## 6. Honest limitations
+## 7. Honest limitations
 
-* **SQLite is not MySQL.** Query plans, locking and buffer behaviour differ. The
-  relative N+1 defect and its removal are valid in both, but absolute latency and
-  capacity numbers from SQLite must not be quoted as production MySQL numbers.
+* **Scratch databases, not production capacity.** Both SQLite and MySQL 8.0.46
+  scratch runs measured the same query counts and similar relative behaviour,
+  but neither is the customer's production data volume.  MySQL latency is now
+  measured; capacity still needs a concurrent test.
 * **Test client, not network.** The numbers exclude TLS, the reverse proxy and
   real browser rendering. They measure server-side application work.
 * **Synthetic data.** Names, prices and distribution are generated; they are not
@@ -125,5 +157,5 @@ to run without `BENCHMARK_CONFIRM=1`.
 * **Only read paths.** Write-path throughput (invoice posting, stock movements)
   is not benchmarked here.
 
-Until a MySQL scratch benchmark and a concurrent load test are run on the target
-host, capacity planning remains **PARTIAL**.
+Until a concurrent load test is run on the target host, capacity planning
+remains **PARTIAL**.

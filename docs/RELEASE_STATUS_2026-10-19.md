@@ -28,8 +28,8 @@ This is the authoritative status of the current release work.  It separates
 | System status / doctor / version | **PASS** | Tests; CLI commands; `/settings/system` permission and redaction tests | Production deployment verification pending |
 | Licensing | **PASS (transparent, non-enforcing)** | Missing/valid/expired/invalid/tampered license tests; no enforcement path; `flask license-status` | It is metadata, not copy protection; legal terms are contractual |
 | Reproducible release | **PASS (script)** | `scripts/release.sh` archives `HEAD`, checks dirty/untracked trees, writes SHA-256 + manifest | Release archive not yet produced/tagged |
-| Performance | **PARTIAL** | N+1 removed: dashboard 1,014→16 queries (993→101 ms p50); receivables 1,003→4 (1,011→127 ms); sales list 139→4; SQLite scratch 300/500/1,000; query-count regression tests | Not MySQL, not concurrent, not a write-path load test |
-| Production deployment of this release | **PENDING** | Code, tests and docs are ready; pre-update backup and schema migration required | Not deployed at the time of writing |
+| Performance | **PARTIAL** | N+1 removed: dashboard 1,014→16 queries (SQLite 993→101 ms p50; MySQL 130.6 ms p50); receivables 1,003→4 (MySQL 147.3 ms); sales list 139→4; query-count regression tests | Not concurrent and not a write-path load test |
+| Production deployment of this release | **PENDING** | Code, tests, MySQL migration and MySQL benchmark are complete; pre-update backup and schema migration required | Not deployed at the time of writing |
 | Public TLS access | **BLOCKED** | Local `curl` and older Chromium 1179 succeed; branded Chrome and server-side `curl` fail with TLS/connection errors; certificate chain inspected but root cause unknown | Needs TLS/ALPN/client comparison before any proxy change |
 | Off-site backup / PITR | **BLOCKED** | Scripts exist and are guarded | No destination, credentials, binlog retention or restore drill |
 
@@ -75,8 +75,9 @@ This is the authoritative status of the current release work.  It separates
   backup/restore were executed against disposable MySQL databases; the new AI
   migration is validated before deployment.
 * **Performance:** the benchmark uses Flask's test client in one process and a
-  synthetic dataset.  It excludes network, TLS, proxy and browser rendering.
-  Absolute MySQL capacity numbers are not claimed.
+  synthetic dataset on both SQLite and MySQL 8.0.46.  It excludes network, TLS,
+  proxy and browser rendering.  Absolute MySQL latency is measured, but
+  concurrent capacity is not claimed.
 * **AI provider:** no external provider account exists.  The fallback and
   boundary are tested with a fake client; the real provider integration is
   **NOT TESTED**.
@@ -94,9 +95,10 @@ This is the authoritative status of the current release work.  It separates
 
 Before calling the release deployed:
 
-- [ ] Full suite green (done locally: 229).
-- [ ] MySQL scratch migration `a1b2c3d4e5f6` → `b2c3d4e5f6a7` validated.
-- [ ] MySQL scratch benchmark recorded (or explicitly left PARTIAL).
+- [x] Full suite green (229 local).
+- [x] MySQL scratch migration `a1b2c3d4e5f6` → `b2c3d4e5f6a7` validated
+      (52 tables, 180 foreign keys, expected AI columns).
+- [x] MySQL scratch benchmark recorded (8 iterations; 300/500/1,000 volumes).
 - [ ] Pre-update backup taken and verified.
 - [ ] New image built with version/commit/date labels.
 - [ ] Migration applied; app recreated non-destructively.

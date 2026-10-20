@@ -193,6 +193,7 @@ regressions, and the legacy database upgrade path. Evidence, including what is *
 |---|---|---|
 | Windows x64, Python 3.14.3 | `pytest -q` (whole suite) after the AI/status/performance work | **229 passed** |
 | Windows x64, SQLite scratch | 300 products / 500 customers / 1,000 invoices; dashboard N+1 removed | **1,014 → 16 queries**, p50 993 → 101 ms |
+| Ubuntu host, MySQL 8.0.46 scratch | Same synthetic volumes; query counts confirmed | dashboard **16 queries / 131 ms p50**; receivables **4 / 147 ms** |
 | Ubuntu 24.04.3, Docker 29.2.0, Compose v5.0.2 | `docker compose config --quiet`, `docker compose build` | ok |
 | MySQL 8.0.46 container | `flask db upgrade` + `flask init-db`, **51 tables**, 179 foreign keys | ok |
 | Disposable MySQL | Full migration from empty schema through `a1b2c3d4e5f6`, catalog pages 200, market POST 302, selling price unchanged | ok |
@@ -258,8 +259,8 @@ checks that were actually executed.
   exist. The status page reports the local backup, not an off-site copy.
 * The local AI assistant is a bounded keyword router, not a general language model. The optional
   external provider may be unavailable; the fallback is local and read-only.
-* Performance evidence currently uses a synthetic SQLite scratch database. A MySQL scratch and a
-  concurrent load test are required before quoting production capacity.
+* Performance evidence currently uses synthetic SQLite and MySQL scratch databases. A concurrent
+  load test is required before quoting production capacity.
 * The MySQL client tools inside the image are MariaDB's and connect with TLS disabled inside the
   private Docker network (the application driver connects the same way).
 

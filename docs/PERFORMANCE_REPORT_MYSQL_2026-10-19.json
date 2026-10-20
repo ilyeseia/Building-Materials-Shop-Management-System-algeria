@@ -1,0 +1,154 @@
+{
+  "generated_at": "2026-10-19T22:16:44.731298+00:00",
+  "version": "1.1.0",
+  "commit": "unknown",
+  "python": "3.13.16",
+  "database": {
+    "dialect": "mysql",
+    "server_version": "8.0.46",
+    "name": "bmshop_scratch_a1d9239",
+    "size_mb": 3.88,
+    "table_count": 52
+  },
+  "volumes": {
+    "products": 300,
+    "customers": 500,
+    "invoices": 1000
+  },
+  "iterations": 8,
+  "results": {
+    "/": {
+      "requests": 8,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 130.6,
+      "p95_ms": 133.8,
+      "mean_ms": 131.6,
+      "min_ms": 128.2,
+      "max_ms": 138.2,
+      "queries_p50": 16,
+      "response_kib_p50": 33.6
+    },
+    "/catalog/products": {
+      "requests": 8,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 22.8,
+      "p95_ms": 23.4,
+      "mean_ms": 22.9,
+      "min_ms": 22.4,
+      "max_ms": 23.6,
+      "queries_p50": 5,
+      "response_kib_p50": 40.0
+    },
+    "/inventory": {
+      "requests": 8,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 21.4,
+      "p95_ms": 21.8,
+      "mean_ms": 21.4,
+      "min_ms": 21.0,
+      "max_ms": 22.2,
+      "queries_p50": 3,
+      "response_kib_p50": 36.0
+    },
+    "/sales/invoices": {
+      "requests": 8,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 24.8,
+      "p95_ms": 28.4,
+      "mean_ms": 25.8,
+      "min_ms": 24.6,
+      "max_ms": 28.6,
+      "queries_p50": 4,
+      "response_kib_p50": 33.4
+    },
+    "/finance/payments": {
+      "requests": 8,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 17.3,
+      "p95_ms": 18.4,
+      "mean_ms": 21.4,
+      "min_ms": 17.1,
+      "max_ms": 49.7,
+      "queries_p50": 2,
+      "response_kib_p50": 36.8
+    },
+    "/reports/receivables": {
+      "requests": 8,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 147.3,
+      "p95_ms": 160.4,
+      "mean_ms": 164.4,
+      "min_ms": 143.1,
+      "max_ms": 276.6,
+      "queries_p50": 4,
+      "response_kib_p50": 94.3
+    },
+    "/reports/stock": {
+      "requests": 8,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 49.9,
+      "p95_ms": 51.5,
+      "mean_ms": 50.4,
+      "min_ms": 49.3,
+      "max_ms": 52.6,
+      "queries_p50": 3,
+      "response_kib_p50": 109.8
+    },
+    "/ai": {
+      "requests": 8,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 5.0,
+      "p95_ms": 5.0,
+      "mean_ms": 5.0,
+      "min_ms": 4.9,
+      "max_ms": 5.4,
+      "queries_p50": 1,
+      "response_kib_p50": 22.8
+    },
+    "service:ai_local_overview": {
+      "requests": 4,
+      "status": [
+        200
+      ],
+      "errors": 0,
+      "p50_ms": 124.9,
+      "p95_ms": 126.4,
+      "mean_ms": 130.7,
+      "min_ms": 123.4,
+      "max_ms": 149.6,
+      "queries_p50": null,
+      "response_kib_p50": null
+    }
+  },
+  "notes": [
+    "Synthetic data in a disposable database; not a production load test.",
+    "Latency is from Flask's test client in a single process, so it excludes real network and proxy time.",
+    "p95 uses the nearest-rank value for the recorded sample.",
+    "SQL query counts come from SQLAlchemy before_cursor_execute events.",
+    "External AI providers are not called; the local deterministic assistant is measured."
+  ]
+}
