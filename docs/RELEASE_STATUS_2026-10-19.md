@@ -1,15 +1,18 @@
-# Release status - 2026-10-19
+# Release status - 2026-10-19 (deployed 2026-10-20)
 
 This is the authoritative status of the current release work.  It separates
 **verified** facts from **not tested** and **blocked** items.  Statuses are
 `PASS`, `PARTIAL`, `FAIL`, `NOT TESTED` and `BLOCKED`.
 
 **Source version:** `1.1.0` (`VERSION`)  
-**Local suite:** **229 passed, 0 failed, 0 skipped** in 78.64 s  
-**Production before this deployment:** revision `7211b7a`, database
+**Deployed commit:** `cc5ed50` (pushed to the `algeria` remote)  
+**Database revision:** `b2c3d4e5f6a7` (head), 52 tables / 180 foreign keys  
+**Local suite:** **229 passed, 0 failed, 0 skipped** in 80.09 s (after the final
+CSS/brand fix; earlier run 78.64 s on `a1d9239`)  
+**Production before this deployment:** image from `7211b7a`, database
 `a1b2c3d4e5f6`, 51 tables, existing rows preserved.  
-**New migration:** `b2c3d4e5f6a7` (append-only AI interactions + per-business
-`enable_ai`).
+**Migration applied:** `b2c3d4e5f6a7` (append-only AI interactions + per-business
+`enable_ai`), non-destructively, with a verified pre-update backup.
 
 ---
 
@@ -23,13 +26,13 @@ This is the authoritative status of the current release work.  It separates
 | Backup and restore | **PASS** | Verified production backup restored in isolation: 51/51 tables, 179 FKs, `CHECK TABLE` pass, zero stock/payment violations; destructive drill on disposable DB with safety backup and report | Off-site copy not configured; no PITR |
 | Backup scheduling and alerts | **PARTIAL** | Host cron wrapper, `backup.env` support, rclone/webhook scripts, failure marker on status page | Schedule not installed on the host yet; no destination or webhook credentials |
 | Read-only AI workspace | **PASS** | 13 tests: permissions, server-side tool re-check, no write tool, audit/append-only, provider failure fallback, tool-output boundary, disable switch persisted | External provider is mocked; no real provider account was tested |
-| Arabic-first UI and responsiveness | **PASS** | Playwright at 1440x900, 834x1112, 390x844: no horizontal overflow on dashboard/products/market pages; drawer opens/closes; theme persistence; AR/FR/EN switch | New AI/status screens need the same final viewport pass |
+| Arabic-first UI and responsiveness | **PASS** | Playwright at 1440x900, 834x1112, 390x844 against the deployed production app through an SSH tunnel: `/ai`, `/settings/system` and the dashboard render with zero horizontal overflow on all three viewports; drawer opens; dark/light theme persists; AR/FR/EN switch verified. Sidebar brand now wraps to two lines so the full French business name is visible (fix in `cc5ed50`, assets bumped to `?v=4`). | Branded-Chrome public TLS path still blocked separately (see below) |
 | Market reference prices | **PASS** | Separate append-only table; unit-aware comparison; stale flag; selling price unchanged in MySQL scratch test | — |
-| System status / doctor / version | **PASS** | Tests; CLI commands; `/settings/system` permission and redaction tests | Production deployment verification pending |
+| System status / doctor / version | **PASS** | Tests; CLI commands; `/settings/system` permission and redaction tests; production page renders `1.1.0` / `cc5ed50` / revision `b2c3d4e5f6a7` behind an authenticated admin session | — |
 | Licensing | **PASS (transparent, non-enforcing)** | Missing/valid/expired/invalid/tampered license tests; no enforcement path; `flask license-status` | It is metadata, not copy protection; legal terms are contractual |
 | Reproducible release | **PASS (script)** | `scripts/release.sh` archives `HEAD`, checks dirty/untracked trees, writes SHA-256 + manifest | Release archive not yet produced/tagged |
 | Performance | **PARTIAL** | N+1 removed: dashboard 1,014→16 queries (SQLite 993→101 ms p50; MySQL 130.6 ms p50); receivables 1,003→4 (MySQL 147.3 ms); sales list 139→4; query-count regression tests | Not concurrent and not a write-path load test |
-| Production deployment of this release | **PENDING** | Code, tests, MySQL migration and MySQL benchmark are complete; pre-update backup and schema migration required | Not deployed at the time of writing |
+| Production deployment of this release | **PASS** | Deployed 2026-10-20 to commit `cc5ed50`: pre-update backup `bmshop-20261020-070510` verified in isolation (51/51 tables, revision `a1b2c3d4e5f6`, CHECK TABLE pass); migration `b2c3d4e5f6a7` applied non-destructively; app container recreated from the labelled image (`flask version` reports `1.1.0 / cc5ed50`); `/healthz` 200, login 200, all 14 authenticated pages 200, AI ask recorded, 52 tables / 180 FKs, products=2 users=2 audit preserved, post-deploy backup `bmshop-20261020-073306` verified (52/52, revision `b2c3d4e5f6a7`) | Rollback path is the downgrade tested on a disposable MySQL scratch DB, not yet exercised against live production |
 | Public TLS access | **BLOCKED** | Local `curl` and older Chromium 1179 succeed; branded Chrome and server-side `curl` fail with TLS/connection errors; certificate chain inspected but root cause unknown | Needs TLS/ALPN/client comparison before any proxy change |
 | Off-site backup / PITR | **BLOCKED** | Scripts exist and are guarded | No destination, credentials, binlog retention or restore drill |
 
@@ -97,14 +100,21 @@ Before calling the release deployed:
 
 - [x] Full suite green (229 local).
 - [x] MySQL scratch migration `a1b2c3d4e5f6` → `b2c3d4e5f6a7` validated
-      (52 tables, 180 foreign keys, expected AI columns).
+      (52 tables, 180 foreign keys, expected AI columns); downgrade/re-upgrade
+      also validated on a disposable MySQL scratch DB before dropping it.
 - [x] MySQL scratch benchmark recorded (8 iterations; 300/500/1,000 volumes).
-- [ ] Pre-update backup taken and verified.
-- [ ] New image built with version/commit/date labels.
-- [ ] Migration applied; app recreated non-destructively.
-- [ ] `/healthz`, login, AI, status page, permissions and preserved row counts
-      verified.
-- [ ] Arabic/French/English and mobile/tablet viewport pass on the new screens.
-- [ ] Final statuses updated with the deployed commit and revision.
+- [x] Pre-update backup taken and verified (`bmshop-20261020-070510`, restored in
+      isolation: 51/51 tables, revision `a1b2c3d4e5f6`, CHECK TABLE pass).
+- [x] New image built with version/commit/date labels (`1.1.0 / cc5ed50`).
+- [x] Migration applied; app recreated non-destructively.
+- [x] `/healthz`, login, AI, status page, permissions and preserved row counts
+      verified against the deployed production app (14 authenticated pages 200;
+      products=2, users=2, audit preserved; 52 tables / 180 FKs; AI ask recorded
+      as `local`/`ok`; post-deploy backup `bmshop-20261020-073306` verified).
+- [x] Arabic/French/English and mobile/tablet viewport pass on the new screens
+      (Playwright at 1440×900, 834×1112, 390×844 through an SSH tunnel; zero
+      horizontal overflow on `/ai`, `/settings/system` and the dashboard; drawer,
+      theme persistence and locale switch verified).
+- [x] Final statuses updated with the deployed commit and revision.
 
 Anything left unchecked above is **not** claimed as complete.

@@ -1,12 +1,11 @@
-# Test and verification report - 2026-10-19
+# Test and verification report - 2026-10-19 (updated 2026-10-20)
 
-**Revision:** working tree after the AI/status/performance changes (deployed commit is
-recorded in the handover; the last fully pushed docs commit was `f081388`)
-**Application suite:** **229 passed, 0 failed, 0 skipped** in 78.64 s
-**Environment:** Windows x64, Python 3.14.3, pytest 9.1.1, SQLite test database
-**Production at time of Phase A evidence:** MySQL 8.0.46, revision `a1b2c3d4e5f6`,
-51 objects / 179 foreign keys.  The AI migration `b2c3d4e5f6a7` is newer and must
-be applied before using the workspace in production.
+**Revision:** commit `cc5ed50` (deployed to production and pushed to `algeria`)  
+**Application suite:** **229 passed, 0 failed, 0 skipped** in 80.09 s  
+**Environment:** Windows x64, Python 3.14.3, pytest 9.1.1, SQLite test database  
+**Production deployment:** MySQL 8.0.46, revision `b2c3d4e5f6a7` (head),
+52 tables / 180 foreign keys.  Pre-update backup `bmshop-20261020-070510` and
+post-deployment backup `bmshop-20261020-073306` were both verified in isolation.
 
 > The older file `docs/TEST_REPORT.md` describes the 184-test baseline.  This
 > file is the authoritative report for the current revision.
@@ -147,26 +146,34 @@ concurrent-load result; capacity remains **PARTIAL / NOT TESTED** for concurrenc
 | Disposable destructive restore (`restore.sh`) | safety backup taken, 51/51 tables, `mysqlcheck` OK, report written, scratch DB dropped |
 | Failure path without target privileges | aborted before import; target unchanged |
 
-## 4. Deployment
+## 4. Production deployment (verified 2026-10-20)
 
 | Check | Result |
 |---|---|
-| `docker compose build app` | PASS |
-| `flask db upgrade` on production | PASS, `5790880d9443 -> a1b2c3d4e5f6` |
-| app and db container health | healthy |
-| `GET /healthz` | 200 |
+| `docker compose build app` | PASS (`1.1.0 / cc5ed50`) |
+| Pre-update backup | `bmshop-20261020-070510` verified (51/51 tables, revision `a1b2c3d4e5f6`, `CHECK TABLE` pass) |
+| `flask db upgrade` on production | PASS, `a1b2c3d4e5f6 -> b2c3d4e5f6a7` |
+| Downgrade/re-upgrade safety | Tested on disposable MySQL scratch DB `bmshop_scratch_a1d9239` before dropping |
+| App container recreation | Non-destructive, `flask version` reports `1.1.0 (cc5ed50)` |
+| `GET /healthz` | 200 `{"database": true, "status": "ok"}` |
 | `GET /login` | 200 |
-| Unauthenticated catalog routes | 302 to sign-in |
-| Existing business rows | preserved |
+| Unauthenticated `/ai` | 302 to `/login?next=%2Fai` |
+| Authenticated pages pass | 14 pages GET 200 (`/`, `/catalog/products`, `/catalog/market-prices`, `/inventory`, `/sales/invoices`, `/purchasing/orders`, `/finance/payments`, `/reports/receivables`, `/reports/stock`, `/ai`, `/settings`, `/settings/system`, `/users`, `/audit`) |
+| AI workspace execution | POST `/ai/ask` handled locally (`local`), answer returned, `ai_interactions` row #2 appended, `ai_query` audit event written |
+| Post-deployment backup | `bmshop-20261020-073306` verified in isolation (52/52 tables, revision `b2c3d4e5f6a7`, 180 FKs, zero stock/payment violations) |
+| Playwright viewports (1440x900, 834x1112, 390x844) | Zero horizontal overflow on `/ai`, `/settings/system` and `/`; mobile drawer opens; dark/light theme persists; AR/FR/EN switch verified |
+| Existing business rows | Preserved (products=2, users=2, audit=53) |
 
 ## 5. Not tested / blocked
 
-* Authenticated browser acceptance (dashboard, forms, both themes) is **BLOCKED**
-  because the current production administrator password is unknown.
-* Real mobile/tablet browser testing is **NOT TESTED** in this iteration.
-* Multi-user load, p50/p95 latency, slow-query analysis and capacity are **NOT
-  TESTED** because production has no representative data.
-* AI workspace, licensing and activation are **not implemented**, so they have no
-  test results.
-* No real weighing scale, PostgreSQL, MySQL 8.4+, MariaDB, point-in-time
-  recovery or multi-host deployment was tested.
+* **Branded-Chrome public TLS path:** the public URL via Tailscale remains
+  blocked for branded Chrome and server-side `curl` due to an SSL/connection
+  handshake failure, while local `curl` and older Chromium 1179 succeed.
+  No production proxy config was changed.
+* **External AI provider:** no external API key exists.  All tests use the local
+  assistant or a mocked client; real external LLM behavior is **NOT TESTED**.
+* **Off-site backups and PITR:** `scripts/backup-offsite.sh` is guarded and
+  verified to report "skipped" when unconfigured, but no remote credentials
+  exist and no point-in-time recovery has been tested.
+* **Concurrent multi-user load:** absolute single-process performance is
+  measured, but high-concurrency write load is **NOT TESTED**.
