@@ -136,6 +136,54 @@ class AIQuestionForm(BaseForm):
     submit = SubmitField("ai.ask")
 
 
+class AIProviderForm(BaseForm):
+    """Register or edit an OpenAI-compatible provider.
+
+    The API key is write-only: an empty box means "keep the stored key", so
+    the administrator never has to read the secret back out of the database to
+    change a name or a default flag.
+    """
+
+    catalog_code = SelectField(
+        "ai.provider_catalog", validators=[Optional()], choices=[("", "—")]
+    )
+    code = StringField("ai.provider_code", validators=[Optional(), Length(max=40)])
+    name = StringField("common.name", validators=[DataRequired(), Length(max=120)])
+    base_url = StringField("ai.provider_base_url", validators=[Optional(), Length(max=255)])
+    api_key = PasswordField("ai.provider_api_key", validators=[Optional(), Length(max=400)])
+    description = TextAreaField("common.description", validators=[Optional()])
+    notes = TextAreaField("ai.provider_notes", validators=[Optional()])
+    free_tier = BooleanField("ai.provider_free_tier", default=False)
+    is_active = BooleanField("common.active", default=True)
+    is_default = BooleanField("ai.provider_default", default=False)
+    submit = SubmitField("common.save")
+
+
+class AIModelForm(BaseForm):
+    """Register or edit one model of a provider."""
+
+    provider_id = SelectField(
+        "ai.model_provider", validators=[DataRequired()], coerce=int, choices=[]
+    )
+    code = StringField("ai.model_code", validators=[DataRequired(), Length(max=120)])
+    label = StringField("ai.model_label", validators=[Optional(), Length(max=120)])
+    description = TextAreaField("common.description", validators=[Optional()])
+    context_window = IntegerField(
+        "ai.model_context", validators=[Optional(), NumberRange(min=0, max=10000000)]
+    )
+    max_output_tokens = IntegerField(
+        "ai.model_output", validators=[Optional(), NumberRange(min=0, max=10000000)]
+    )
+    supports_tools = BooleanField("ai.model_tools", default=True)
+    free_tier = BooleanField("ai.model_free_tier", default=False)
+    is_active = BooleanField("common.active", default=True)
+    is_default = BooleanField("ai.model_default", default=False)
+    sort_order = IntegerField(
+        "ai.model_order", validators=[Optional(), NumberRange(min=0, max=10000)], default=0
+    )
+    submit = SubmitField("common.save")
+
+
 class ChangePasswordForm(BaseForm):
     current_password = PasswordField("auth.current_password", validators=[DataRequired()])
     new_password = PasswordField("auth.new_password", validators=[DataRequired(), Length(min=8)])

@@ -43,3 +43,108 @@ class AIInteraction(db.Model):
 
     def __repr__(self) -> str:  # pragma: no cover - debugging helper
         return f"<AIInteraction {self.id} {self.status}>"
+
+
+# ---------------------------------------------------------------------------
+# Provider and model registry
+# ---------------------------------------------------------------------------
+
+#: Every supported provider speaks the OpenAI ``/chat/completions`` dialect.
+AI_PROVIDER_OPENAI_COMPATIBLE = "openai_compatible"
+
+#: A provider that needs no credential at all (a local runtime).
+AI_PROVIDER_LOCAL_RUNTIME = "local_runtime"
+
+
+class AIProvider(db.Model):
+    """An OpenAI-compatible endpoint the assistant may talk to.
+
+    The credential is stored encrypted (see ``app.services.ai_keys``) and is
+    never rendered, logged or returned by the API.  Only a short hint such as
+    the last four characters is kept in clear so the administrator can tell
+    two keys apart without the secret ever being displayed.
+    """
+
+    __tablename__ = "ai_providers"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text)
+    provider_type = db.Column(
+        db.String(30), nullable=False, default=AI_PROVIDER_OPENAI_COMPATIBLE
+    )
+    base_url = db.Column(db.String(255), nullable=False)
+    #: Fernet ciphertext.  ``None`` for a local runtime that needs no key.
+    api_key_encrypted = db.Column(db.Text)
+    #: Last four characters of the key, for display only.
+    key_hint = db.Column(db.String(16))
+    #: The provider offers a free quota; shown as a badge in the interface.
+    free_tier = db.Column(db.Boolean, nullable=False, default=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    is_default = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    models = db.relationship(
+        "AIModel",
+        backref="provider",
+        cascade="all, delete-orphan",
+        order_by="AIModel.sort_order, AIModel.id",
+        lazy="select",
+    )
+
+    @property
+    def needs_key(self) -> bool:
+        return self.provider_type != AI_PROVIDER_LOCAL_RUNTIME
+
+    @property
+    def has_key(self) -> bool:
+        return bool(self.api_key_encrypted)
+
+    @property
+    def active_model(self):
+        """The model that would be used for this provider, if any."""
+        for model in self.models:
+            if model.is_active and model.is_default:
+                return model
+        for model in self.models:
+            if model.is_active:
+                return model
+        return None
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging helper
+        return f"<AIProvider {self.code} active={self.is_active}>"
+
+
+class AIModel(db.Model):
+    """One model offered by a provider.
+
+    ``code`` is the identifier sent to the provider (``gpt-4o-mini``,
+    ``meta-llama/llama-3.3-70b-instruct:free``, ...).  ``label`` is what the
+    administrator sees.
+    """
+
+    __tablename__ = "ai_models"
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider_id = db.Column(
+        db.Integer, db.ForeignKey("ai_providers.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    code = db.Column(db.String(120), nullable=False, index=True)
+    label = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text)
+    context_window = db.Column(db.Integer)
+    max_output_tokens = db.Column(db.Integer)
+    supports_tools = db.Column(db.Boolean, nullable=False, default=True)
+    free_tier = db.Column(db.Boolean, nullable=False, default=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging helper
+        return f"<AIModel {self.provider_id}:{self.code}>"

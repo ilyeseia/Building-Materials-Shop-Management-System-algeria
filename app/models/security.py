@@ -98,6 +98,7 @@ GRANULAR_PERMISSIONS = {
     "settings.manage": "Modify Business & System Settings",
     "audit.view": "Inspect Security Audit Logs",
     "ai.view": "Access Read-Only AI Workspace",
+    "ai.manage": "Manage AI Providers, Models & API Keys",
 }
 
 _ALL_VIEWS = {f"{name}.view" for name in _PAIRS} | {

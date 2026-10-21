@@ -22,11 +22,13 @@ Design rules
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 import time
 import urllib.error
 import urllib.request
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -596,20 +598,143 @@ def _tool_summary(name: str, payload: Any) -> str:
 # Provider-agnostic client
 # ---------------------------------------------------------------------------
 
+
+@dataclass(frozen=True)
+class ProviderTarget:
+    """One endpoint the assistant may talk to.
+
+    ``source`` is ``"database"`` for a provider the administrator registered
+    through the interface and ``"environment"`` for the legacy
+    ``AI_PROVIDER``/``AI_API_KEY`` configuration.
+    """
+
+    code: str
+    label: str
+    base_url: str
+    api_key: str | None
+    model: str | None
+    source: str = "database"
+    free_tier: bool = False
+
+    @property
+    def configured(self) -> bool:
+        if not self.base_url:
+            return False
+        if self.api_key is None:
+            # A local runtime needs no credential.
+            return True
+        return bool(self.api_key)
+
+
+#: The provider the current request is talking to.  ``_chat_completion`` keeps
+#: its single-argument signature so it stays easy to mock.
+_PROVIDER_TARGET: ContextVar[ProviderTarget | None] = ContextVar(
+    "bmshop_ai_provider_target", default=None
+)
+
+
+def _database_targets() -> list[ProviderTarget]:
+    """The providers registered through the interface, best first."""
+    from app.services import ai_providers, ai_keys
+
+    targets: list[ProviderTarget] = []
+    try:
+        providers = list(ai_providers.usable_providers())
+    except Exception:  # pragma: no cover - the table may not exist yet
+        return targets
+    for provider in providers:
+        model = provider.active_model
+        if model is None:
+            continue
+        try:
+            key = ai_providers.credential_for(provider)
+        except ai_keys.KeyUnavailable:
+            # The stored credential cannot be opened (rotated SECRET_KEY).
+            continue
+        targets.append(
+            ProviderTarget(
+                code=provider.code,
+                label=provider.name,
+                base_url=provider.base_url,
+                api_key=key,
+                model=model.code,
+                source="database",
+                free_tier=bool(provider.free_tier or model.free_tier),
+            )
+        )
+    return targets
+
+
+def _environment_target() -> ProviderTarget | None:
+    """The legacy environment configuration, when it is set up."""
+    provider = str(current_app.config.get("AI_PROVIDER") or "local").strip().lower()
+    if provider == "local":
+        return None
+    base = str(current_app.config.get("AI_BASE_URL") or "").rstrip("/")
+    key = current_app.config.get("AI_API_KEY")
+    if not base or not key:
+        return None
+    return ProviderTarget(
+        code=provider,
+        label=provider,
+        base_url=base,
+        api_key=str(key),
+        model=current_app.config.get("AI_MODEL"),
+        source="environment",
+    )
+
+
+def provider_targets() -> list[ProviderTarget]:
+    """Every endpoint that may answer, most preferred first.
+
+    A provider registered in the database wins over the environment
+    configuration, because the administrator chose it explicitly.
+    """
+    targets = _database_targets()
+    environment = _environment_target()
+    if environment is not None:
+        targets = [target for target in targets if target.code != environment.code]
+        targets.append(environment)
+    return targets
+
+
 def provider_info() -> dict:
     """Non-secret provider status for the UI."""
-    provider = str(current_app.config.get("AI_PROVIDER") or "local")
-    key = current_app.config.get("AI_API_KEY")
-    if provider == "local":
+    from app.services import ai_providers
+
+    targets = provider_targets()
+    if not targets:
         return {"provider": "local", "configured": True, "model": None,
-                "label": translate("ai.provider_local")}
-    configured = bool(key)
+                "label": translate("ai.provider_local"), "source": "local",
+                "free_tier": True, "alternatives": 0}
+    primary = targets[0]
     return {
-        "provider": provider,
-        "configured": configured,
-        "model": current_app.config.get("AI_MODEL"),
-        "label": translate("ai.provider_external"),
+        "provider": primary.code,
+        "configured": primary.configured,
+        "model": primary.model,
+        "label": primary.label,
+        "source": primary.source,
+        "free_tier": primary.free_tier,
+        "alternatives": len(targets) - 1,
     }
+
+
+def provider_overview() -> dict:
+    """A complete, secret-free picture of the provider configuration."""
+    from app.services import ai_providers
+
+    overview: dict = {
+        "targets": provider_targets(),
+        "registered": [],
+        "default": None,
+        "local_available": True,
+    }
+    try:
+        overview["registered"] = ai_providers.list_providers()
+        overview["default"] = ai_providers.default_provider()
+    except Exception:  # pragma: no cover - the table may not exist yet
+        pass
+    return overview
 
 
 def _system_prompt(tools: list[dict]) -> str:
@@ -629,24 +754,38 @@ def _system_prompt(tools: list[dict]) -> str:
 
 
 def _chat_completion(messages: list[dict]) -> str:
+    """Call the active provider.  Raises :class:`ProviderError` on any failure."""
     config = current_app.config
-    base = str(config.get("AI_BASE_URL") or "").rstrip("/")
-    key = config.get("AI_API_KEY")
-    if not base or not key:
+    target = _PROVIDER_TARGET.get()
+    if target is not None:
+        base = target.base_url.rstrip("/")
+        key = target.api_key
+        model = target.model
+    else:
+        base = str(config.get("AI_BASE_URL") or "").rstrip("/")
+        key = config.get("AI_API_KEY")
+        model = config.get("AI_MODEL")
+    if not base:
         raise ProviderError("ai.provider_not_configured")
+    if key is None and not str(base).startswith("http://127.0.0.1"):
+        # A hosted provider needs a credential; a local runtime does not.
+        if target is None or target.api_key is None:
+            raise ProviderError("ai.provider_not_configured")
     payload = {
-        "model": config.get("AI_MODEL"),
+        "model": model,
         "messages": messages,
         "temperature": 0,
     }
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "bmshop-ai/1.0",
+    }
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
     request = urllib.request.Request(
         f"{base}/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {key}",
-            "User-Agent": "bmshop-ai/1.0",
-        },
+        headers=headers,
         method="POST",
     )
     try:
@@ -733,7 +872,14 @@ def _ask_provider(question: str, user, tools: list[dict]) -> tuple[str, list[dic
 # ---------------------------------------------------------------------------
 
 def ask(question: str, user) -> AssistantResult:
-    """Answer a question using the configured provider, falling back locally."""
+    """Answer a question using the configured providers, falling back locally.
+
+    The registered providers are tried in order (the default one first).  The
+    first one that answers wins.  When every provider fails - a wrong key, a
+    quota that ran out, a network that is down - the deterministic local
+    assistant answers instead and the failure is recorded, so the shop is never
+    left without an answer.
+    """
     started = time.perf_counter()
     max_chars = int(current_app.config.get("AI_MAX_QUESTION_CHARS", 1000))
     cleaned = _SPACE_RE.sub(" ", str(question or "").strip())[:max_chars]
@@ -742,29 +888,43 @@ def ask(question: str, user) -> AssistantResult:
                                error_key="ai.empty_question")
 
     tools = available_tools(user)
-    info = provider_info()
-    if info["provider"] != "local" and info["configured"]:
+    targets = provider_targets()
+    last_error: ProviderError | None = None
+
+    for target in targets:
+        if not target.configured:
+            last_error = ProviderError("ai.provider_not_configured")
+            continue
+        token = _PROVIDER_TARGET.set(target)
         try:
             answer, calls = _ask_provider(cleaned, user, tools)
-            return AssistantResult(
-                answer=answer or translate("ai.answer.generic"),
-                status=AI_STATUS_OK,
-                provider=info["provider"],
-                model=info.get("model"),
-                tool_calls=calls,
-                latency_ms=int((time.perf_counter() - started) * 1000),
-            )
         except ProviderError as error:
-            answer, calls = _local_answer(cleaned, user)
-            return AssistantResult(
-                answer=answer,
-                status=AI_STATUS_UNAVAILABLE,
-                provider="local",
-                tool_calls=calls,
-                latency_ms=int((time.perf_counter() - started) * 1000),
-                error_key=error.key,
+            last_error = error
+            current_app.logger.warning(
+                "AI provider '%s' failed: %s", target.code, error.key
             )
+            continue
+        finally:
+            _PROVIDER_TARGET.reset(token)
+        return AssistantResult(
+            answer=answer or translate("ai.answer.generic"),
+            status=AI_STATUS_OK,
+            provider=target.code,
+            model=target.model,
+            tool_calls=calls,
+            latency_ms=int((time.perf_counter() - started) * 1000),
+        )
+
     answer, calls = _local_answer(cleaned, user)
+    if last_error is not None:
+        return AssistantResult(
+            answer=answer,
+            status=AI_STATUS_UNAVAILABLE,
+            provider="local",
+            tool_calls=calls,
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            error_key=last_error.key,
+        )
     return AssistantResult(
         answer=answer,
         status=AI_STATUS_OK,

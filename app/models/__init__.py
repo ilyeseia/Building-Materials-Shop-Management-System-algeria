@@ -28,6 +28,10 @@ from app.models.base import (  # noqa: F401
 )
 from app.models.ai import (  # noqa: F401
     AIInteraction,
+    AIModel,
+    AIProvider,
+    AI_PROVIDER_LOCAL_RUNTIME,
+    AI_PROVIDER_OPENAI_COMPATIBLE,
     AI_STATUS_ERROR,
     AI_STATUS_OK,
     AI_STATUS_REFUSED,
@@ -117,5 +121,9 @@ __all__ = [
     "Vehicle", "Driver", "Carrier", "Trip", "TripExpense",
     "BusinessSettings", "NumberSequence", "AuditEvent",
     "AIInteraction",
+    "AIProvider",
+    "AIModel",
+    "AI_PROVIDER_OPENAI_COMPATIBLE",
+    "AI_PROVIDER_LOCAL_RUNTIME",
     "AI_STATUS_OK", "AI_STATUS_UNAVAILABLE", "AI_STATUS_ERROR", "AI_STATUS_REFUSED",
 ]

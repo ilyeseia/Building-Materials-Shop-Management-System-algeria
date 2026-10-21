@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, flashes, field, checkbox %}
+{% block title %}{{ t(title_key) }}{% endblock %}
+{% block content %}
+<h1>{{ t(title_key) }}</h1>
+
+{{ flashes() }}
+
+{% if entry %}
+<div class="card">
+  <h2>{{ entry.name }}</h2>
+  <p class="small muted">{{ entry.description }}</p>
+  {% if entry.free_tier %}<span class="badge info">{{ t('ai.free_tier') }}</span>{% endif %}
+  {% if entry.suggested_models %}
+    <p class="small muted">{{ t('ai.suggested_models') }}</p>
+    <ul class="tool-list mono small">
+      {% for model in entry.suggested_models %}<li>{{ model }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+  {% if entry.signup_url %}
+    <p><a class="btn small secondary" href="{{ entry.signup_url }}" rel="noopener noreferrer"
+           target="_blank">{{ t('ai.get_key') }}</a></p>
+  {% endif %}
+</div>
+{% endif %}
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.catalog_code) }}
+    {{ field(form.code) }}
+    {{ field(form.name) }}
+    {{ field(form.base_url) }}
+    {{ field(form.api_key) }}
+    {{ field(form.description) }}
+    {{ field(form.notes) }}
+    {{ checkbox(form.free_tier) }}
+    {{ checkbox(form.is_active) }}
+    {{ checkbox(form.is_default) }}
+  </div>
+  {% if provider and provider.has_key %}
+    <p class="small muted">
+      {{ t('ai.key_stored') }}
+      <span class="mono">{{ provider.key_hint }}</span>.
+      {{ t('ai.key_stored_help') }}
+    </p>
+  {% endif %}
+  <p class="small muted">{{ t('ai.key_help') }}</p>
+  <div class="form-actions">
+    {{ form.submit(class_='btn') }}
+    <a class="btn secondary" href="{{ url_for('ai.providers') }}">{{ t('action.cancel') }}</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, flashes, empty_state %}
+{% block title %}{{ t(title_key) }}{% endblock %}
+{% block content %}
+<h1>{{ t('ai.providers_title') }}</h1>
+<p class="small muted">{{ t('ai.providers_subtitle') }}</p>
+
+{{ flashes() }}
+
+{#- Which endpoint answers today. -#}
+<div class="card">
+  <div class="card-head">
+    <div>
+      <h2>{{ t('ai.active_provider') }}</h2>
+      <p class="small muted">{{ t('ai.active_provider_help') }}</p>
+    </div>
+  </div>
+  <div class="ai-meta">
+    {% if targets %}
+      {% for target in targets %}
+        <span class="badge {{ 'confirmed' if loop.first else 'info' }} mono">
+          {{ target.code }}{% if target.model %} / {{ target.model }}{% endif %}
+        </span>
+        {% if target.free_tier %}<span class="badge info">{{ t('ai.free_tier') }}</span>{% endif %}
+      {% endfor %}
+    {% else %}
+      <span class="badge confirmed">{{ t('ai.provider_local') }}</span>
+    {% endif %}
+  </div>
+  {% if not targets %}
+    <p class="small muted">{{ t('ai.no_provider_hint') }}</p>
+  {% endif %}
+  {% if environment.configured %}
+    <p class="small muted">
+      {{ t('ai.environment_provider') }}:
+      <span class="mono">{{ environment.provider }}</span>
+      {% if environment.model %}/ <span class="mono">{{ environment.model }}</span>{% endif %}
+      {% if environment.key_hint %}({{ t('ai.key_hint') }} {{ environment.key_hint }}){% endif %}
+    </p>
+  {% endif %}
+</div>
+
+{#- The registered providers. -#}
+<div class="card">
+  <div class="card-head">
+    <div>
+      <h2>{{ t('ai.registered_providers') }}</h2>
+      <p class="small muted">{{ t('ai.registered_providers_help') }}</p>
+    </div>
+    <div class="form-actions">
+      <a class="btn" href="{{ url_for('ai.provider_new') }}">{{ t('ai.provider_add') }}</a>
+      <a class="btn secondary" href="{{ url_for('ai.models') }}">{{ t('ai.models_title') }}</a>
+    </div>
+  </div>
+
+  {% if providers %}
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>{{ t('common.name') }}</th>
+            <th>{{ t('ai.provider_code') }}</th>
+            <th>{{ t('ai.provider_base_url') }}</th>
+            <th>{{ t('ai.provider_api_key') }}</th>
+            <th>{{ t('ai.models_title') }}</th>
+            <th>{{ t('common.status') }}</th>
+            <th>{{ t('common.actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for provider in providers %}
+          <tr>
+            <td>
+              <strong>{{ provider.name }}</strong>
+              {% if provider.is_default %}<span class="badge confirmed">{{ t('ai.default') }}</span>{% endif %}
+              {% if provider.free_tier %}<span class="badge info">{{ t('ai.free_tier') }}</span>{% endif %}
+              {% if provider.description %}
+                <div class="small muted">{{ provider.description }}</div>
+              {% endif %}
+            </td>
+            <td class="mono small">{{ provider.code }}</td>
+            <td class="mono small">{{ provider.base_url or '—' }}</td>
+            <td class="mono small">
+              {% if provider.needs_key %}
+                {% if provider.key_hint %}
+                  {{ provider.key_hint }}
+                {% else %}
+                  <span class="badge failed">{{ t('ai.no_key') }}</span>
+                {% endif %}
+              {% else %}
+                <span class="badge info">{{ t('ai.no_key_needed') }}</span>
+              {% endif %}
+            </td>
+            <td class="small">
+              {% if provider.models %}
+                {{ provider.models | length }}
+              {% else %}
+                <span class="badge warning">{{ t('ai.no_models') }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if provider.is_active %}
+                <span class="badge confirmed">{{ t('common.active') }}</span>
+              {% else %}
+                <span class="badge failed">{{ t('common.inactive') }}</span>
+              {% endif %}
+            </td>
+            <td class="small">
+              <div class="row-actions">
+                <a class="btn small secondary" href="{{ url_for('ai.provider_edit', provider_id=provider.id) }}">{{ t('action.edit') }}</a>
+                <a class="btn small secondary" href="{{ url_for('ai.models', provider=provider.id) }}">{{ t('ai.models_title') }}</a>
+                <form method="post" action="{{ url_for('ai.provider_test', provider_id=provider.id) }}" class="inline">
+                  {{ csrf_token() }}
+                  <button class="btn small secondary" type="submit">{{ t('ai.test_connection') }}</button>
+                </form>
+                {% if not provider.is_default %}
+                <form method="post" action="{{ url_for('ai.provider_default', provider_id=provider.id) }}" class="inline">
+                  {{ csrf_token() }}
+                  <button class="btn small" type="submit">{{ t('ai.make_default') }}</button>
+                </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('ai.provider_delete', provider_id=provider.id) }}" class="inline"
+                      onsubmit="return confirm('{{ t('ai.confirm_delete_provider') }}');">
+                  {{ csrf_token() }}
+                  <button class="btn small danger" type="submit">{{ t('action.delete') }}</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {{ empty_state(t('ai.no_providers'), 'sparkles') }}
+  {% endif %}
+</div>
+
+{#- The catalogue of known OpenAI-compatible endpoints. -#}
+<div class="card">
+  <div class="card-head">
+    <div>
+      <h2>{{ t('ai.provider_catalog') }}</h2>
+      <p class="small muted">{{ t('ai.provider_catalog_help') }}</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>{{ t('common.name') }}</th>
+          <th>{{ t('ai.provider_base_url') }}</th>
+          <th>{{ t('ai.quota') }}</th>
+          <th>{{ t('ai.suggested_models') }}</th>
+          <th>{{ t('common.actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in catalog %}
+        <tr>
+          <td>
+            <strong>{{ entry.name }}</strong>
+            <div class="small muted">{{ entry.description }}</div>
+          </td>
+          <td class="mono small">{{ entry.base_url or '—' }}</td>
+          <td>
+            {% if entry.free_tier %}
+              <span class="badge info">{{ t('ai.free_tier') }}</span>
+            {% else %}
+              <span class="badge">{{ t('ai.paid') }}</span>
+            {% endif %}
+            {% if not entry.needs_key %}
+              <span class="badge confirmed">{{ t('ai.no_key_needed') }}</span>
+            {% endif %}
+          </td>
+          <td class="small mono">
+            {% for model in entry.suggested_models %}
+              <div>{{ model }}</div>
+            {% else %}
+              —
+            {% endfor %}
+          </td>
+          <td>
+            <a class="btn small secondary"
+               href="{{ url_for('ai.provider_new') }}?catalog={{ entry.code }}">{{ t('ai.use_this') }}</a>
+            {% if entry.signup_url %}
+              <a class="btn small secondary" href="{{ entry.signup_url }}" rel="noopener noreferrer"
+                 target="_blank">{{ t('ai.get_key') }}</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

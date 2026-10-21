@@ -95,6 +95,10 @@
         {% if can('ai.view') and config.FEATURE_AI and g.settings and g.settings.enable_ai %}
           <div class="nav-group">{{ t('nav.ai') }}</div>
           {{ nav_item(url_for('ai.index'), t('nav.ai_workspace'), 'sparkles') }}
+          {% if can('ai.manage') %}
+            {{ nav_item(url_for('ai.providers'), t('nav.ai_providers'), 'settings') }}
+            {{ nav_item(url_for('ai.models'), t('ai.models_title'), 'layers') }}
+          {% endif %}
         {% endif %}
 
         {% if can('sales.view') %}

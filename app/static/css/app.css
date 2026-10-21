@@ -2355,3 +2355,48 @@ body.print-document table.data thead th {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   21. AI provider & model administration
+   -------------------------------------------------------------------------- */
+
+/* A row of small action buttons inside a table cell.  The forms are inline
+   so a delete button does not break the row onto a new line. */
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.row-actions .inline {
+  display: inline-flex;
+  margin: 0;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline select {
+  min-height: 34px;
+  padding: 4px 8px;
+}
+
+.card-head .form-actions {
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+/* The provider catalogue lists a model identifier per line. */
+.tool-list.mono li {
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+/* A free quota is worth highlighting, but it must not shout. */
+.badge.info {
+  font-weight: 600;
+}

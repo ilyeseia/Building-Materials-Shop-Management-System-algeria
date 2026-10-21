@@ -28,7 +28,9 @@ alembic==1.20.0
 # MySQL driver for the production database.
 PyMySQL==1.2.3
 # Required by PyMySQL to authenticate against MySQL 8 default auth
-# (caching_sha2_password).  Not needed for SQLite development.
+# (caching_sha2_password), and by the AI provider registry to encrypt the
+# provider API keys at rest (Fernet/AES + HMAC).  Not needed for SQLite
+# development, but the AI administration screens need it.
 cryptography>=42.0
 
 # --- Documents and Arabic text ----------------------------------------------

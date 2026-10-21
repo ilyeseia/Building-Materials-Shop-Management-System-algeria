@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, flashes, empty_state %}
+{% block title %}{{ t(title_key) }}{% endblock %}
+{% block content %}
+<h1>{{ t(title_key) }}</h1>
+<p class="small muted">{{ t('ai.models_subtitle') }}</p>
+
+{{ flashes() }}
+
+<div class="card">
+  <div class="card-head">
+    <div>
+      <h2>{{ t('ai.registered_models') }}</h2>
+    </div>
+    <div class="form-actions">
+      <form method="get" class="inline">
+        <select name="provider" onchange="this.form.submit()">
+          <option value="">{{ t('ai.all_providers') }}</option>
+          {% for provider in providers %}
+            <option value="{{ provider.id }}" {{ 'selected' if selected_provider == provider.id }}>
+              {{ provider.name }}
+            </option>
+          {% endfor %}
+        </select>
+        <noscript><button class="btn small" type="submit">{{ t('action.filter') }}</button></noscript>
+      </form>
+      <a class="btn" href="{{ url_for('ai.model_new') }}{% if selected_provider %}?provider={{ selected_provider }}{% endif %}">
+        {{ t('ai.model_add') }}
+      </a>
+      <a class="btn secondary" href="{{ url_for('ai.providers') }}">{{ t('ai.providers_title') }}</a>
+    </div>
+  </div>
+
+  {% if models %}
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>{{ t('ai.model_label') }}</th>
+            <th>{{ t('ai.model_code') }}</th>
+            <th>{{ t('ai.model_provider') }}</th>
+            <th>{{ t('ai.model_context') }}</th>
+            <th>{{ t('ai.quota') }}</th>
+            <th>{{ t('common.status') }}</th>
+            <th>{{ t('common.actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for model in models %}
+          <tr>
+            <td>
+              <strong>{{ model.label }}</strong>
+              {% if model.is_default %}<span class="badge confirmed">{{ t('ai.default') }}</span>{% endif %}
+              {% if model.free_tier %}<span class="badge info">{{ t('ai.free_tier') }}</span>{% endif %}
+              {% if not model.supports_tools %}
+                <span class="badge warning">{{ t('ai.no_tools_support') }}</span>
+              {% endif %}
+              {% if model.description %}
+                <div class="small muted">{{ model.description }}</div>
+              {% endif %}
+            </td>
+            <td class="mono small">{{ model.code }}</td>
+            <td class="small">{{ model.provider.name if model.provider else '—' }}</td>
+            <td class="num small">{{ model.context_window or '—' }}</td>
+            <td>
+              {% if model.free_tier %}
+                <span class="badge info">{{ t('ai.free_tier') }}</span>
+              {% else %}
+                <span class="badge">{{ t('ai.paid') }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if model.is_active %}
+                <span class="badge confirmed">{{ t('common.active') }}</span>
+              {% else %}
+                <span class="badge failed">{{ t('common.inactive') }}</span>
+              {% endif %}
+            </td>
+            <td class="small">
+              <div class="row-actions">
+                <a class="btn small secondary" href="{{ url_for('ai.model_edit', model_id=model.id) }}">{{ t('action.edit') }}</a>
+                <form method="post" action="{{ url_for('ai.model_toggle', model_id=model.id) }}" class="inline">
+                  {{ csrf_token() }}
+                  <button class="btn small secondary" type="submit">
+                    {{ t('common.deactivate') if model.is_active else t('common.activate') }}
+                  </button>
+                </form>
+                <form method="post" action="{{ url_for('ai.model_delete', model_id=model.id) }}" class="inline"
+                      onsubmit="return confirm('{{ t('ai.confirm_delete_model') }}');">
+                  {{ csrf_token() }}
+                  <button class="btn small danger" type="submit">{{ t('action.delete') }}</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {{ empty_state(t('ai.no_models_registered'), 'sparkles') }}
+  {% endif %}
+</div>
+{% endblock %}

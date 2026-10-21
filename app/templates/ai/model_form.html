@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, flashes, field, checkbox %}
+{% block title %}{{ t(title_key) }}{% endblock %}
+{% block content %}
+<h1>{{ t(title_key) }}</h1>
+
+{{ flashes() }}
+
+<form method="post" class="card">
+  {{ form.hidden_tag() }}
+  <div class="form-grid">
+    {{ field(form.provider_id) }}
+    {{ field(form.code) }}
+    {{ field(form.label) }}
+    {{ field(form.description) }}
+    {{ field(form.context_window) }}
+    {{ field(form.max_output_tokens) }}
+    {{ field(form.sort_order) }}
+    {{ checkbox(form.supports_tools) }}
+    {{ checkbox(form.free_tier) }}
+    {{ checkbox(form.is_active) }}
+    {{ checkbox(form.is_default) }}
+  </div>
+  <p class="small muted">{{ t('ai.model_code_help') }}</p>
+  <div class="form-actions">
+    {{ form.submit(class_='btn') }}
+    <a class="btn secondary" href="{{ url_for('ai.models') }}{% if provider %}?provider={{ provider.id }}{% endif %}">
+      {{ t('action.cancel') }}
+    </a>
+  </div>
+</form>
+{% endblock %}
