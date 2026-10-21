@@ -193,6 +193,33 @@ def _register_request_hooks(app: Flask) -> None:
 
             logout_user()
             session.clear()
+            # Keep Flask-Login's marker so the persistent "remember me"
+            # cookie is deleted too; otherwise the cookie would sign the
+            # disabled account straight back in.
+            session["_remember"] = "clear"
+            return None
+
+        # An administrator can revoke a session from the sessions page.  That
+        # revocation has to end the access, not just grey out a row in a
+        # table, so the tracked session is checked on every request.
+        if current_user.is_authenticated:
+            from app.services.session_mgr import SessionManager
+
+            session_key = session.get("_session_key")
+            if session_key and not SessionManager.is_session_active(session_key):
+                from flask_login import logout_user
+
+                logout_user()
+                session.clear()
+                session["_remember"] = "clear"
+                return None
+
+            # Keep the "last seen" stamp fresh, but never let a database
+            # problem turn into a failed request.
+            try:
+                SessionManager.update_session_activity(session_key)
+            except Exception:  # pragma: no cover - best effort only
+                pass
         return None
 
     @app.after_request

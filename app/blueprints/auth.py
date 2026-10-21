@@ -73,9 +73,11 @@ def login():
         user.record_login_success()
         reset_login_limit(username)
 
-        # Create session record with a generated session key
-        import secrets
-        session_key = session.get("_session_key") or secrets.token_hex(16)
+        # Create session record with a generated session key.  The key is
+        # reused when the browser session already carries one, which is safe
+        # because create_session() refreshes the existing row instead of
+        # inserting a duplicate that would break the unique index.
+        session_key = session.get("_session_key") or SessionManager.generate_session_key()
         session["_session_key"] = session_key
         SessionManager.create_session(
             user_id=user.id,
@@ -125,8 +127,7 @@ def verify_totp():
             reset_login_limit(user.username)
 
             # Create session record with a generated session key
-            import secrets
-            session_key = session.get("_session_key") or secrets.token_hex(16)
+            session_key = session.get("_session_key") or SessionManager.generate_session_key()
             session["_session_key"] = session_key
             SessionManager.create_session(
                 user_id=user.id,
@@ -158,14 +159,20 @@ def verify_totp():
 @bp.route("/logout", methods=["GET", "POST"])
 @login_required
 def logout():
-    # Revoke the current session
+    # Revoke the tracked session.  A missing row must never stop the sign-out:
+    # the row can already be gone (a second logout, an administrator revoked
+    # it) and the user still has to end up signed out.
     session_key = session.get("_session_key")
-    if session_key:
-        SessionManager.revoke_session(session_key)
+    SessionManager.revoke_session_if_present(session_key)
     audit.record("logout", "user", current_user_id(), summary=current_user.username)
-    username = current_user.username
     logout_user()
     session.clear()
+    # Flask-Login marks the persistent "remember me" cookie for deletion with
+    # session["_remember"] = "clear".  session.clear() above wiped that
+    # marker, so the cookie survived the sign-out and Flask-Login silently
+    # signed the user back in on the next request.  Re-apply the marker so
+    # the after_request hook really deletes the cookie.
+    session["_remember"] = "clear"
     db.session.commit()
     flash(translate("auth.signed_out"), "success")
     return redirect(url_for("auth.login"))
@@ -185,8 +192,12 @@ def change_password():
                 flash(translate(key), "danger")
             return render_template("auth/password.html", form=form), 400
         current_user.set_password(form.new_password.data)
-        # Revoke all other sessions on password change
-        SessionManager.revoke_all_sessions(current_user.id, except_session=session.sid)
+        # Revoke every other session on a password change.  The session that
+        # made the change keeps working; it is identified by the tracked
+        # session key, not by Flask's own session id.
+        SessionManager.revoke_all_sessions(
+            current_user.id, except_session=session.get("_session_key")
+        )
         audit.record("password_changed", "user", current_user.id, summary=current_user.username)
         db.session.commit()
         flash(translate("auth.password_changed"), "success")
