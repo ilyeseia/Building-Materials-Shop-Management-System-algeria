@@ -105,6 +105,36 @@ class SessionManager:
         return bool(session.is_active)
 
     @staticmethod
+    def check_and_touch(session_key: Optional[str], stale_after_seconds: int = 60):
+        """Check a session and refresh its "last seen" stamp in one pass.
+
+        Returns ``(is_active, tracked)``.  ``tracked`` is ``False`` when the
+        session was never registered, which is not an error.
+
+        The stamp is only written when it is older than ``stale_after_seconds``
+        so that a busy user does not cause an UPDATE on every single request.
+        """
+        if not session_key:
+            return True, False
+        session = SessionManager.get_session(session_key)
+        if session is None:
+            # Not tracked (for example a session that predates the table).
+            # Refusing access here would lock the operator out.
+            return True, False
+        if not session.is_active:
+            return False, True
+        last_seen = session.last_activity_at
+        if last_seen is not None:
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            elapsed = (datetime.now(timezone.utc) - last_seen).total_seconds()
+            if elapsed < stale_after_seconds:
+                return True, True
+        session.last_activity_at = datetime.now(timezone.utc)
+        db.session.flush()
+        return True, True
+
+    @staticmethod
     def revoke_all_sessions(user_id: int, except_session: Optional[str] = None) -> int:
         query = update(UserSession).where(
             UserSession.user_id == user_id,

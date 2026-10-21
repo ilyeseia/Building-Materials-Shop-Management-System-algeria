@@ -177,3 +177,31 @@ def app_client_for(client):
     """A second, independent browser session against the same application."""
     return client.application.test_client()
 
+
+def test_the_per_request_session_check_stays_cheap(client, make_user):
+    """Enforcing revoked sessions must not reintroduce a per-request flood.
+
+    The check adds at most one SELECT and only writes the "last seen" stamp
+    once a minute, so a dashboard request stays well under the guard.
+    """
+    from sqlalchemy import event
+
+    make_user("admin", Role.ADMIN, password="Karim-2026-Ok")
+    db.session.commit()
+
+    _login(client, "admin", "Karim-2026-Ok")
+
+    counter = {"queries": 0}
+
+    def count(*_args):
+        counter["queries"] += 1
+
+    event.listen(db.engine, "before_cursor_execute", count)
+    try:
+        response = client.get("/")
+    finally:
+        event.remove(db.engine, "before_cursor_execute", count)
+
+    assert response.status_code == 200
+    assert counter["queries"] < 30, f"the dashboard issued {counter['queries']} queries"
+

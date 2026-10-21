@@ -206,20 +206,20 @@ def _register_request_hooks(app: Flask) -> None:
             from app.services.session_mgr import SessionManager
 
             session_key = session.get("_session_key")
-            if session_key and not SessionManager.is_session_active(session_key):
-                from flask_login import logout_user
+            if session_key:
+                # One query for the check; the "last seen" stamp is only
+                # written when it is actually stale.
+                try:
+                    active, _tracked = SessionManager.check_and_touch(session_key)
+                except Exception:  # pragma: no cover - never break a request
+                    active = True
+                if not active:
+                    from flask_login import logout_user
 
-                logout_user()
-                session.clear()
-                session["_remember"] = "clear"
-                return None
-
-            # Keep the "last seen" stamp fresh, but never let a database
-            # problem turn into a failed request.
-            try:
-                SessionManager.update_session_activity(session_key)
-            except Exception:  # pragma: no cover - best effort only
-                pass
+                    logout_user()
+                    session.clear()
+                    session["_remember"] = "clear"
+                    return None
         return None
 
     @app.after_request
