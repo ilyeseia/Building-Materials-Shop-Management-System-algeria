@@ -1,19 +1,26 @@
-# Release status - 2026-10-19 (deployed 2026-10-20)
+# Release status - 2026-10-19 (updated 2026-10-21)
 
 This is the authoritative status of the current release work.  It separates
 **verified** facts from **not tested** and **blocked** items.  Statuses are
 `PASS`, `PARTIAL`, `FAIL`, `NOT TESTED` and `BLOCKED`.
 
 **Source version:** `1.1.0` (`VERSION`)  
-**Deployed commit:** `670781b` (pushed to the `algeria` remote)  
-**Database revision:** `d4e5f6a7b8c9` (head), 57 tables / 184 foreign keys  
-**Local suite:** **306 passed, 0 failed, 0 skipped** in 252.12 s (229 original +
-28 IAM frontend tests + 10 logout tests + 39 AI provider tests)  
-**Production before this deployment:** image from `54e54f5`, database
-`c3d4e5f6a7b8`, 55 tables, 183 foreign keys, existing rows preserved.  
-**Migrations applied:** `b2c3d4e5f6a7` (append-only AI interactions + per-business
-`enable_ai`), `c3d4e5f6a7b8` (Enterprise IAM) and `d4e5f6a7b8c9` (AI provider
-registry), non-destructively, each with a verified pre-update backup.
+**Deployed code commit:** `a971706` (pushed to the `algeria` remote; the image
+label `org.opencontainers.image.revision` confirms it)  
+**Database revision:** `e5f6a7b8c9d0` (head), 57 tables / 184 foreign keys  
+**Local suite:** **322 passed, 0 failed, 0 skipped** in 362.92 s (2 pre-existing
+Flask-Login deprecation warnings)  
+**Production before this deployment:** image from `ce96e0a`, database
+`e5f6a7b8c9d0`, 57 tables, 184 foreign keys, products=2, users=2, existing rows
+preserved.  
+**Production after this deployment:** image from `a971706`, same database
+revision, 57 tables / 184 foreign keys, products=2, users=2, 27 append-only AI
+interaction rows, both containers healthy, `flask doctor` 11 PASS / 1 WARN.  
+**Migrations applied (historical):** `b2c3d4e5f6a7` (append-only AI interactions
++ per-business `enable_ai`), `c3d4e5f6a7b8` (Enterprise IAM),
+`d4e5f6a7b8c9` (AI provider registry) and `e5f6a7b8c9d0` (provider error
+detail), non-destructively, each with a verified pre-update backup.  The
+in-place-answer change `a971706` adds **no migration**.
 
 ---
 
@@ -26,17 +33,17 @@ registry), non-destructively, each with a verified pre-update backup.
 | Sales, purchasing, payments, AR/AP | **PASS** | Full chain tests; two-process MySQL payment race drill (one allocation, one refusal); aging tests | No external payment gateway |
 | Backup and restore | **PASS** | Verified production backup restored in isolation: 51/51 tables, 179 FKs, `CHECK TABLE` pass, zero stock/payment violations; destructive drill on disposable DB with safety backup and report | Off-site copy not configured; no PITR |
 | Backup scheduling and alerts | **PARTIAL** | Host cron wrapper, `backup.env` support, rclone/webhook scripts, failure marker on status page | Schedule not installed on the host yet; no destination or webhook credentials |
-| Read-only AI workspace | **PASS** | 13 tests: permissions, server-side tool re-check, no write tool, audit/append-only, provider failure fallback, tool-output boundary, disable switch persisted | External provider is mocked; no real provider account was tested |
-| Arabic-first UI and responsiveness | **PASS** | Playwright at 1440x900, 834x1112, 390x844 against the deployed production app through an SSH tunnel: `/ai`, `/settings/system` and the dashboard render with zero horizontal overflow on all three viewports; drawer opens; dark/light theme persists; AR/FR/EN switch verified. Sidebar brand now wraps to two lines so the full French business name is visible (fix in `cc5ed50`, assets bumped to `?v=4`). | Branded-Chrome public TLS path still blocked separately (see below) |
+| AI workspace (local + registered providers) | **PASS** | Per-question target selector, multi-turn history, opt-in general mode, collapsible tool trace; real OpenRouter MiniMax answers in production through the in-place fetch path (interactions 24 and 27, 7.9 s / 7.0 s, status `ok`); the provider test lists 468 models and the MiniMax chat test returns in 993 ms; local fallback and provider failure recording verified; the async path is browser-tested and the no-JavaScript redirect path is covered by the route tests (section 8) | Nemotron can hit an upstream 502/capacity limit; concurrent load is **NOT TESTED**; public TLS path remains **BLOCKED** |
+| Arabic-first UI and responsiveness | **PASS** | Production Playwright at 1440×900, 834×1112 and 390×844 through an SSH tunnel: `/ai` renders the in-place answer/history and has zero horizontal overflow at all three widths; the async flow was also exercised at 1440 and 390 with screenshots; dark/light theme persists and AR/FR/EN parity is enforced by the translation tests.  Current cache-busting assets are `app.css?v=7` and `app.js?v=5`.  The earlier sidebar-brand fix (`cc5ed50`) remains in place. | Branded-Chrome public TLS path still **BLOCKED** separately (see below) |
 | Market reference prices | **PASS** | Separate append-only table; unit-aware comparison; stale flag; selling price unchanged in MySQL scratch test | — |
-| System status / doctor / version | **PASS** | Tests; CLI commands; `/settings/system` permission and redaction tests; production page renders `1.1.0` / `cc5ed50` / revision `b2c3d4e5f6a7` behind an authenticated admin session | — |
+| System status / doctor / version | **PASS** | Tests; CLI commands; `/settings/system` permission and redaction tests; deployed `flask version` reports `1.1.0 / a971706 / 2026-10-21T12:48:14Z`, `flask db current` reports `e5f6a7b8c9d0`, and `flask doctor` reports 11 PASS / 1 WARN (pre-existing Arabic-PDF-font warning) | — |
 | Licensing | **PASS (transparent, non-enforcing)** | Missing/valid/expired/invalid/tampered license tests; no enforcement path; `flask license-status` | It is metadata, not copy protection; legal terms are contractual |
 | Reproducible release | **PASS (script)** | `scripts/release.sh` archives `HEAD`, checks dirty/untracked trees, writes SHA-256 + manifest | Release archive not yet produced/tagged |
 | Performance | **PARTIAL** | N+1 removed: dashboard 1,014→16 queries (SQLite 993→101 ms p50; MySQL 130.6 ms p50); receivables 1,003→4 (MySQL 147.3 ms); sales list 139→4; query-count regression tests | Not concurrent and not a write-path load test |
-| Production deployment of this release | **PASS** | Deployed 2026-10-21 to commit `82334a9`: pre-update backup `bmshop-20261021-071417` verified in isolation (52/52 tables, revision `b2c3d4e5f6a7`, 180 FKs, CHECK TABLE pass); migration `c3d4e5f6a7b8` applied non-destructively (55 tables, 183 FKs); image rebuilt and container recreated with labels `1.1.0 / 82334a9`; both containers healthy; `/healthz` 200, login 200, 16 authenticated pages 200; `flask doctor` 11 PASS / 1 WARN; products=2 and users=2 preserved; post-deploy backup `bmshop-20261021-072223` verified (55/55, revision `c3d4e5f6a7b8`) | Rollback path is the downgrade tested on a disposable MySQL scratch DB, not yet exercised against live production |
-| Enterprise IAM subsystem | **PASS** | Migration `c3d4e5f6a7b8` applied; role/session/profile/security/audit pages 200 on the deployed app; functional test creates a custom role, creates a user with it, verifies the permission set, verifies the AI tool list is filtered, creates and revokes a session, and confirms the revocation is audited; 266 local tests pass | Playwright browser rendering of the new pages is NOT TESTED; the admin password was reset during deployment (see section 5) |
+| Production deployment of this release | **PASS** | Deployed 2026-10-21 to commit `a971706` (no migration): pre-deploy backup `pre-async-20261021` (JSON 268 rows; SQL `bmshop-20261021-124255`; checksum and gzip verified) and post-deploy backup `post-async-20261021` (JSON 290 rows / 27 AI interactions; SQL `bmshop-20261021-125307`, dump-complete marker; checksum and gzip verified); image rebuilt with labels `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; app recreated non-destructively; both containers healthy; `/healthz` 200; login and browser acceptance passed; database unchanged at 57 tables / 184 FKs, products=2, users=2, revision `e5f6a7b8c9d0` | The live rollback path was not exercised in this deployment (no migration, so rollback is image-only); public TLS path remains **BLOCKED** |
+| Enterprise IAM subsystem | **PASS** | Migration `c3d4e5f6a7b8` applied; role/session/profile/security/audit pages 200 on the deployed app; functional test creates a custom role, creates a user with it, verifies the permission set, verifies the AI tool list is filtered, creates and revokes a session, and confirms the revocation is audited; the current full suite has 322 passing tests | Playwright browser rendering of the new IAM pages is **NOT TESTED**; the admin password reset note in section 5 is historical |
 | Sign-out ends the session | **PASS (fixed)** | Four defects found and fixed (see section 6).  Verified in a real browser against the deployed app with "remember me" ticked: the `remember_token` cookie is deleted, the dashboard redirects to the login page, and signing in again works.  Verified over real HTTP with a cookie jar as well. | `GET /logout` is still accepted for backward compatibility and is therefore a low-severity forced-logout vector; the application's own UI uses `POST` with a CSRF token |
-| AI provider administration | **PASS** | Migration `d4e5f6a7b8c9` applied (57 tables, 184 FKs); the provider and model pages render on the deployed app; the API key is stored encrypted and never rendered; the catalogue of free-tier OpenAI-compatible gateways is offered; a real browser check passes with 0 console errors and 0 failed HTTP responses (see section 7) | No external provider account is configured, so a real provider call is **NOT TESTED**; the public Funnel path needs the tsdproxy note in section 7.6 |
+| AI provider administration | **PASS** | Migrations `d4e5f6a7b8c9` and `e5f6a7b8c9d0` applied; provider id=3 OpenRouter is configured, the key is stored encrypted and never rendered; the live provider test listed **468 models** (audit event 177) and the MiniMax chat test returned in **993 ms** (audit event 178); real answers arrived through both the server-rendered form and the in-place fetch path (interactions 24 and 27) | Nemotron can fail upstream with a capacity 502 (recorded fallback); free-tier latency/availability has no SLA; the public Funnel path needs the section 7.6 note |
 | Public TLS access | **BLOCKED** | Application side is healthy: the host port `127.0.0.1:8090` answers `/login` and `/healthz` with 200 on every attempt, and the `tsdproxy` container is up and healthy.  The public Funnel path is intermittent: 12 rapid requests to the public `/login` on 2026-10-21 returned 5 × 200 and 7 × connection failures, while the same URL succeeded on 4 of 5 earlier attempts.  This is the pre-existing, still-unresolved TLS/ALPN problem and is **not** caused by the 2026-10-21 deployment. | Needs a TLS/ALPN/client comparison between Tailscale Funnel, tsdproxy and the client before any proxy change |
 | Off-site backup / PITR | **BLOCKED** | Scripts exist and are guarded | No destination, credentials, binlog retention or restore drill |
 
@@ -46,14 +53,32 @@ registry), non-destructively, each with a verified pre-update backup.
 
 ### AI workspace
 
-* `/ai` and rate-limited `/ai/ask`; fixed read-only tool registry.
-* Tools filtered by the signed-in user's role and re-checked inside
-  `execute_tool`; no write tool exists.
-* Local deterministic provider is the default and makes no network calls.
-* Optional OpenAI-compatible provider uses environment-only credentials; any
-  failure falls back locally and is recorded as `unavailable`.
-* Append-only `ai_interactions` table plus normal audit event.
-* Per-business switch (`BusinessSettings.enable_ai`) and global `FEATURE_AI`.
+* `/ai` is a flexible workspace: the user chooses the target per question
+  (automatic/default, any active registered model, or the deterministic local
+  assistant), switches to opt-in general mode, sees a collapsible tool trace,
+  and keeps a multi-turn history (the last three exchanges are sent as context).
+* In-place answers: the composer posts to the rate-limited `/ai/ask` with
+  `fetch`; the server returns JSON when `X-Requested-With: fetch` or `Accept`
+  prefers JSON, and the page replaces the latest card and prepends the exchange
+  to the history without a reload.  The existing redirect/flash path is kept for
+  clients without JavaScript.
+* The JSON response carries the translated status/provider/model/latency, tool
+  calls, fallback notices and manager-only scrubbed provider detail; the
+  browser clones inert `<template>` markup and fills all user/provider text
+  with `textContent`, never `innerHTML`.
+* The same CSRF, rate-limit, permission and append-only audit checks apply to
+  both paths.  A network failure, HTTP error or provider fallback is shown in
+  place and the composer is restored; only success clears the question box.
+* The registered default is tried first for `auto`; if every provider fails, the
+  local deterministic assistant answers and the interaction is recorded as
+  `unavailable` with the scrubbed error.
+* Provider tool turns are sent as user-role `TOOL RESULT` messages, which
+  OpenRouter accepts (fix `ce96e0a`); an empty completion is treated as a
+  failure instead of a blank answer.  Local deterministic tools remain
+  permission-filtered and re-checked server-side; no write tool exists.
+* Append-only `ai_interactions` table (provider, model, latency, tool calls,
+  error detail) plus normal audit events, the per-business switch
+  (`BusinessSettings.enable_ai`) and global `FEATURE_AI`.
 * The AI read path inherited the reporting N+1; it is fixed by the same batch.
 
 ### Operations and commercial layer
@@ -76,20 +101,31 @@ registry), non-destructively, each with a verified pre-update backup.
 
 ## 3. Evidence and limitations
 
-* **Test suite:** SQLite in-memory/file database with `db.create_all()`; this is
-  not a MySQL test of every code path.
+* **Test suite:** SQLite in-memory/file database with `db.create_all()`; the
+  current suite is **322 passed, 0 failed, 0 skipped** in 362.92 s.  This is not
+  a MySQL test of every code path.
 * **MySQL checks:** migrations, catalog pages, market prices, payment locking and
-  backup/restore were executed against disposable MySQL databases; the new AI
-  migration is validated before deployment.
+  backup/restore were executed against disposable MySQL databases.  The current
+  `a971706` change adds no migration; production remains at
+  `e5f6a7b8c9d0`.
 * **Performance:** the benchmark uses Flask's test client in one process and a
   synthetic dataset on both SQLite and MySQL 8.0.46.  It excludes network, TLS,
   proxy and browser rendering.  Absolute MySQL latency is measured, but
   concurrent capacity is not claimed.
-* **AI provider:** no external provider account exists.  The fallback and
-  boundary are tested with a fake client; the real provider integration is
+* **AI provider:** the real OpenRouter MiniMax path is exercised in production
+  (interactions 24 and 27; 7.9 s and 7.0 s; status `ok`), the live provider test
+  listed 468 models and the MiniMax chat test returned in 993 ms.  The free
+  Nemotron model can still be rejected upstream with a capacity 502; auto/local
+  fallback records the scrubbed error (interaction 17).  Concurrent load is
   **NOT TESTED**.
-* **Backups:** local backup/restore is verified.  Off-site and point-in-time
-  recovery are **BLOCKED** until a destination and credentials exist.
+* **AI browser flow:** local and production Playwright runs exercised the
+  no-reload answer, history update/10-turn cap, localized network and HTTP
+  errors, Arabic RTL layout and 1440/834/390 widths.  The production run wrote
+  interactions 24-27 and provider/model audit events 177-178.
+* **Backups:** the pre- and post-deploy backups for `a971706` were checksum- and
+  gzip-verified (`pre-async-20261021`, `post-async-20261021`); they were not
+  restored into a disposable database in this code-only deployment.  Off-site
+  and point-in-time recovery remain **BLOCKED**.
 * **Licensing:** transparent metadata only.  It cannot and does not disable the
   application.
 * **TLS:** the public URL is reachable with local `curl` and older Chromium 1179,
@@ -100,38 +136,45 @@ registry), non-destructively, each with a verified pre-update backup.
 
 ## 4. Release gate
 
-Before calling the release deployed:
+Before calling `a971706` deployed:
 
-- [x] Full suite green (257 local).
-- [x] MySQL scratch migration `b2c3d4e5f6a7` → `c3d4e5f6a7b8` validated against
-      the live MySQL 8.0.46 database (55 tables, 183 foreign keys, all 11 new
-      user columns and the 3 new tables present); the migration is idempotent
-      (`sa.inspect` guards) and the downgrade was validated on a disposable
-      MySQL scratch DB.
-- [x] Pre-update backup taken and verified (`bmshop-20261021-071417`, restored in
-      isolation: 52/52 tables, revision `b2c3d4e5f6a7`, CHECK TABLE pass).
-- [x] New image built with version/commit/date labels (`1.1.0 / 82334a9`).
-- [x] Migration applied; app recreated non-destructively; both containers healthy.
-- [x] `/healthz`, login, AI, status page, permissions and preserved row counts
-      verified against the deployed production app (16 authenticated pages 200;
-      products=2, users=2, audit preserved; 55 tables / 183 FKs;
-      post-deploy backup `bmshop-20261021-072223` verified).
-- [x] IAM features verified on the deployed app: role creation, user creation
-      with a custom role, permission evaluation, AI tool filtering, session
-      creation and revocation, audit of the revocation, and cleanup of the
-      verification data.
-- [x] Arabic/French/English and mobile/tablet viewport pass on the new screens
-      (Playwright at 1440×900, 834×1112, 390×844 through an SSH tunnel; zero
-      horizontal overflow on `/ai`, `/settings/system` and the dashboard; drawer,
-      theme persistence and locale switch verified).  **The new IAM pages have
-      not been rendered in a browser yet — this is recorded as NOT TESTED.**
-- [x] Final statuses updated with the deployed commit and revision.
+- [x] Full suite green: **322 passed, 0 failed, 0 skipped** (362.92 s).
+- [x] No migration in this change; production stayed at `e5f6a7b8c9d0`
+      (57 tables, 184 foreign keys).  The earlier migration chain and backups
+      are recorded in the header and sections 5/7.
+- [x] Pre-deploy backup `pre-async-20261021` (JSON 268 rows / 20 AI
+      interactions, 56 exported tables; SQL `bmshop-20261021-124255`) copied to
+      `/home/sysuser/backups/` and verified: SHA-256 OK, gzip OK,
+      `-- Dump completed` present.
+- [x] Image built with labels `1.1.0 / a971706 / 2026-10-21T12:48:14Z`.
+- [x] App recreated non-destructively (`docker compose up -d --no-deps app`);
+      app and db containers healthy; `/healthz` 200.
+- [x] Database preserved: 57 tables, 184 FKs, products=2, users=2,
+      AI interactions append-only (27), revision `e5f6a7b8c9d0`.
+- [x] Production acceptance: admin login, `/ai` async answer, local target,
+      real OpenRouter MiniMax answer through the JSON path, tool trace,
+      network/HTTP error handling in place, 10-turn cap, 1440/834/390 no
+      overflow, provider `/models` test (468 models, audit 177) and MiniMax
+      chat test (993 ms, audit 178).
+- [x] Post-deploy backup `post-async-20261021` (JSON 290 rows / 27 AI
+      interactions; SQL `bmshop-20261021-125307`) copied to
+      `/home/sysuser/backups/` and verified: SHA-256 OK, gzip OK,
+      `-- Dump completed` present.
+- [x] Arabic/French/English parity and the no-JavaScript fallback are covered
+      by tests.  **The new IAM pages are still not rendered in a browser —
+      recorded as NOT TESTED.**
+- [x] Final statuses updated with `a971706` and the production evidence.
 
-Anything left unchecked above is **not** claimed as complete.
+Anything left unchecked above is **not** claimed as complete.  The outstanding
+release-level items are the public TLS path, off-site backup/PITR and
+concurrent-load capacity, recorded below.
 
 ---
 
-## 5. Enterprise IAM Subsystem (DEPLOYED 2026-10-21, commit `82334a9`)
+## 5. Enterprise IAM Subsystem (deployed 2026-10-21, commit `82334a9`; historical)
+
+This section records the IAM deployment.  The current deployment is `a971706`;
+see sections 1, 4 and 8 for its status.
 
 ### Backend - PASS
 
@@ -193,7 +236,9 @@ Anything left unchecked above is **not** claimed as complete.
 
 ### Tests - PASS
 
-* **257 tests pass** (229 existing + 28 new IAM frontend tests)
+* **The IAM work added 28 tests at the time; the current full suite is 322
+  passing tests** (229 original + 28 IAM frontend tests + 10 logout tests + 39
+  provider tests + later workspace/async tests)
 * IAM backend test script validates all core logic
 * AI IAM test validates tool filtering and execution permissions
 * Production acceptance (Flask test client against the live app, real admin
@@ -203,7 +248,10 @@ Anything left unchecked above is **not** claimed as complete.
   with it, permission set verified, AI tool list filtered, session created and
   revoked, revocation audited, test data removed afterwards
 
-### Production deployment evidence (2026-10-21)
+### Production deployment evidence (2026-10-21, historical for `82334a9`)
+
+This table is the evidence for the IAM deployment.  It is kept for the audit
+trail; the current deployment is recorded in sections 1 and 8.
 
 | Item | Result |
 |---|---|
@@ -224,18 +272,19 @@ hash when the deployment was verified, so the application could not be signed
 into for the acceptance checks.  The password was therefore reset with the
 application's own CLI (`flask reset-password --username admin`), a new random
 18-character value was written to `~/.bmshop-admin-password` (mode `600`), and
-the old `.env` was kept as `.env.bak.20261021071549`.  **The admin password has
-changed.**
+the old `.env` was kept as `.env.bak.20261021071549`.  **The admin password
+changed at that deployment.**  The `a971706` deployment used the same
+credentials and did **not** reset the password.
 
 ### Remaining for IAM
 
 | Item | Status |
 |---|---|
 | Playwright UI verification for the new IAM pages | **NOT TESTED** — the pages are verified server-side (HTTP 200, content and permissions) but not rendered in a browser |
-| External AI provider integration | **NOT TESTED** — still mocked; no provider account |
+| External AI provider integration | **PASS** (later deployment `a971706`) — real OpenRouter MiniMax answers (interactions 24 and 27), provider `/models` test 468 models, MiniMax chat test 993 ms |
 | Concurrent-load capacity | **NOT TESTED** — the benchmark is single-process |
 | Off-site backup / PITR | **BLOCKED** — no destination or credentials |
-| Public TLS path from branded Chrome | **BLOCKED** — root cause still unknown; server-side `curl` over HTTPS now succeeds |
+| Public TLS path from branded Chrome | **BLOCKED** — root cause still unknown; the SSH tunnel is used for browser acceptance |
 
 ---
 
@@ -278,7 +327,7 @@ remember cookie survived - the account was immediately signed back in.
 
 | Check | Result |
 |---|---|
-| New automated tests | 10 in `tests/test_logout.py`; **266 local tests pass** |
+| New automated tests | 10 in `tests/test_logout.py`; **266 local tests passed at the time** (the current suite is 322) |
 | Query cost | A dashboard request stays at 17-20 queries; a regression guard asserts it stays under 30 |
 | Real HTTP against the deployed server (cookie jar) | `remember_token` set on sign-in with "remember me" ticked, **removed** after sign-out, dashboard then redirects to `/login`, tracked session row `is_active = 0` |
 | Real browser against the deployed app (Playwright, 1440×900) | Signed in with "remember me" ticked, sign-out button pressed, redirected to `/login`, `remember_token` cookie **deleted**, dashboard not reachable, signing in again works, **0 console/page errors** |
@@ -295,10 +344,12 @@ documented behaviour.
 
 ---
 
-## 7. AI provider and model administration (deployed 2026-10-21, commit `56bf190`)
+## 7. AI provider and model administration (deployed 2026-10-21; commits `56bf190` → `a971706`)
 
 The assistant could only talk to one endpoint, fixed by environment variables.
-This release adds a registry an administrator drives from the interface.
+This release adds a registry an administrator drives from the interface.  The
+provider registry was introduced in `56bf190`/`670781b`; the flexible workspace
+and in-place answers that use it are in section 8.
 
 ### 7.1 The interface
 
@@ -354,12 +405,12 @@ Two new tests fail the build if either pattern comes back.
 
 | Check | Result |
 |---|---|
-| New automated tests | 39 in `tests/test_ai_providers.py`; **306 local tests pass** |
-| MySQL scratch migration | The whole chain applied to a disposable MySQL 8 database: 57 tables, 184 foreign keys, CHECK TABLE pass, insert/read works, the delete cascades, and the downgrade and re-upgrade both succeed |
-| Authenticated acceptance on the deployed app | All five new pages 200, the catalogue is listed, a provider is created with the key stored encrypted, the key decrypts back, the key never appears in a page, a model is created, the provider becomes the default, the assistant targets it, and the verification data is removed afterwards |
-| Real browser (Playwright, deployed app) | The catalogue renders, the form pre-fills the base URL, a provider is created, **the key is not in the page**, a model is created, the delete buttons work, zero horizontal overflow at 1440×900, 834×1112 and 390×844, **0 console errors and 0 failed HTTP responses** |
-| Backups | Pre-deploy `bmshop-20261021-095621`, post-deploy `bmshop-20261021-100132` (55+ tables, revision `d4e5f6a7b8c9`, CHECK TABLE pass) |
-| Release identity | `flask version` reports `1.1.0 / 670781b`; `flask doctor` 11 PASS / 1 WARN |
+| New automated tests | 39 provider tests in `tests/test_ai_providers.py` and 25 AI workspace tests in `tests/test_ai.py` (including 4 async/JSON/template tests); **322 local tests pass** |
+| MySQL scratch migration | The whole provider chain applied to a disposable MySQL 8 database: 57 tables, 184 foreign keys, CHECK TABLE pass, insert/read works, the delete cascades, and the downgrade and re-upgrade both succeed.  The current `a971706` change adds no migration |
+| Authenticated acceptance on the deployed app | The historical provider-registry acceptance (all five pages 200, encrypted key, catalogue, delete) passed.  On the current deployment the live provider test listed **468 models** (audit event 177) and the MiniMax chat test returned in **993 ms** (audit event 178) |
+| Real browser (Playwright, deployed app) | The earlier provider-admin browser checks passed (catalogue, pre-filled form, encrypted key not in the page, delete buttons, zero overflow at 1440/834/390, 0 console errors/failed responses).  On `a971706` the browser exercised the async composer, a real OpenRouter answer, the tool trace, in-place errors and the provider/model test buttons, with screenshots at 1440/834/390 |
+| Backups | `a971706`: pre `pre-async-20261021` (JSON 268 rows / 20 AI; SQL `bmshop-20261021-124255`), post `post-async-20261021` (JSON 290 rows / 27 AI; SQL `bmshop-20261021-125307`); SHA-256 and gzip verified.  Earlier provider-admin backups `bmshop-20261021-095621` / `-100132` remain historical |
+| Release identity | `flask version` reports `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; `flask db current` reports `e5f6a7b8c9d0`; `flask doctor` 11 PASS / 1 WARN |
 
 ### 7.6 An operational note about the one-off migration container
 
@@ -379,6 +430,75 @@ defect.
 
 | Item | Status |
 |---|---|
-| A real external provider call | **NOT TESTED** — no provider account is configured on this installation.  The client, the tool loop, the permission re-check and the fallback are all tested with a mocked transport |
-| The `/models` listing against a real gateway | **NOT TESTED** — the code path is implemented and the failure modes are handled, but it was never called against a live provider |
+| A real external provider call | **PASS** — OpenRouter MiniMax answered in production through the server-rendered form and the in-place fetch path (interactions 24 and 27; 7901 ms and 6968 ms; status `ok`); the MiniMax chat test returned in **993 ms** (audit 178) |
+| The `/models` listing against a real gateway | **PASS** — the provider test reached OpenRouter and listed **468 models** (audit 177) |
+| The in-place async workspace | **PASS** — local and production Playwright runs; see section 8 |
 | Concurrent load with an external provider | **NOT TESTED** |
+| Nemotron free-model reliability | **PARTIAL** — the free Nemotron model can return an upstream 502/capacity error; auto/local fallback works and records the scrubbed error (interaction 17).  MiniMax is the working default |
+
+---
+
+## 8. Flexible workspace and in-place answers (deployed 2026-10-21, commit `a971706`)
+
+### 8.1 What changed
+
+The workspace is no longer a single fixed provider and a single question.  On
+top of the provider registry (`56bf190`, `670781b`) and the flexible workspace
+(`aa3c66c`), `ce96e0a` made provider tool turns OpenRouter-compatible and
+`a971706` made the answer appear on the same page.
+
+* **Per-question choice:** automatic/default, any active registered model, or
+  the deterministic local assistant.  A conversation keeps the last three
+  exchanges as context; the interface lists the last ten exchanges and trims
+  the oldest after ten.
+* **General mode:** an explicit opt-in lets the assistant answer a general
+  question without business tools.  It is off by default and labelled in the
+  interface.
+* **In-place answer:** the form is enhanced with `fetch`; `/ai/ask` returns
+  `200 application/json` with `ok`, `interaction`, `notices` and a manager-only
+  `error_detail` when the request asks for JSON.  The latest card and the first
+  history turn are replaced/prepended from inert `<template>` elements; no page
+  reload occurs.  The URL is updated with `history.replaceState`
+  (`?interaction=<id>`), so a manual reload still shows the same interaction.
+* **Progressive enhancement:** without JavaScript, the same form posts
+  normally and keeps the redirect/flash behaviour.  The async path applies the
+  same CSRF token, rate limit, permissions and append-only interaction write.
+* **Errors and state:** pending spinner, disabled submit, `aria-busy`,
+  `aria-live`, localized network/HTTP messages, full control restoration, and
+  clearing the question box only after success.
+* **Tool protocol:** provider tool results are sent as user-role messages with
+  a `TOOL RESULT` prefix; this avoids the OpenRouter rejection of a `tool` role
+  without a matching tool call.  Empty completions are treated as failures.
+* **Safety:** all server/LLM text is inserted with `textContent`; the templates
+  contain no user data.  Provider error detail is scrubbed of secrets and only
+  rendered for users with `ai.manage`.
+
+### 8.2 Verification
+
+| Check | Evidence |
+|---|---|
+| Full suite | **322 passed, 0 failed, 0 skipped** in 362.92 s |
+| AI tests | 25 in `tests/test_ai.py` (including 4 async/JSON/template tests) + 39 in `tests/test_ai_providers.py` |
+| Local browser | Playwright at 1440 and 390/834: login, template markers, pending state, first and second answers without reload, URL interaction, history update, 10-turn cap, clearing only on success, network abort and HTTP 400 shown in place, no horizontal overflow, and no console errors or failed responses during successful asks |
+| Production browser | Playwright through the SSH tunnel: admin login, 10 initial history turns, local target, two in-place answers, real OpenRouter answer via the JSON path, tool trace, network/HTTP errors in place, screenshots `prod-async-ai-1440.png`, `prod-async-ai-834.png`, `prod-async-ai-390.png`; no overflow and no console/failed responses during successful asks |
+| Production interactions | `22` local 5 ms low-stock and `23` local 21 ms overview (first run); `24` OpenRouter MiniMax 7901 ms "يوجد منتجان نشطان في الكتالوج." (first provider run; the answer was correct, the test assertion was too literal); `25` local 1 ms low-stock and `26` local 190 ms overview (rerun); `27` OpenRouter MiniMax **6968 ms** "يوجد منتجان نشطان." (final provider run); all `ok` |
+| Provider/model tests | Provider 3 test: **468 models** (audit 177, 2026-10-21 12:51:09 UTC); MiniMax model 9: **993 ms** (audit 178, 12:51:12 UTC) |
+| Backups | `pre-async-20261021` JSON 268 rows / 20 AI, SQL `bmshop-20261021-124255`; `post-async-20261021` JSON 290 rows / 27 AI, SQL `bmshop-20261021-125307`; both SHA-256 and gzip verified, dump-complete marker present |
+| Release identity | `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; revision `e5f6a7b8c9d0`; 57 tables / 184 FKs; products=2, users=2 |
+
+The production browser run is the code deployed in `a971706`; its first
+provider assertion was too literal (`"2"` inside an Arabic sentence) and was
+corrected to accept the Arabic dual "منتجان".  The answer itself was correct on
+the first run (interaction 24).  The corrected run is interaction 27.  The
+interaction table is append-only, so these verification rows are retained.
+
+### 8.3 Remaining
+
+| Item | Status |
+|---|---|
+| Concurrent-load capacity with a real provider | **NOT TESTED** |
+| Nemotron free-model reliability | **PARTIAL** — upstream 502/capacity is possible; fallback records the error; MiniMax is the working default |
+| Public Funnel/TLS path | **BLOCKED** — intermittent; all browser acceptance used the SSH tunnel to `127.0.0.1:8090` |
+| Off-site backup / PITR | **BLOCKED** — no destination, credentials, binlog retention or restore drill |
+| Restore of the `a971706` backups in isolation | **NOT TESTED** — the backups were checksum/gzip-verified, but this code-only deploy did not repeat a full restore drill; the earlier restore drill remains the evidence for the mechanism |
+| Browser rendering of the new IAM pages | **NOT TESTED** (unchanged) |
