@@ -1124,6 +1124,7 @@ CATALOGUE.update({
     "ai.provider_unavailable": "Le fournisseur est injoignable.",
     "ai.provider_rejected": "Le fournisseur a refusé la requête.",
     "ai.provider_bad_response": "Le fournisseur a renvoyé une réponse invalide.",
+    "ai.provider_empty_answer": "Le fournisseur a renvoyé une réponse vide.",
     "ai.subtitle": "Posez librement une question sur le stock, les ventes et les soldes, ou sur tout autre sujet. Choisissez le fournisseur et le modèle pour chaque question.",
     "ai.read_only": "Lecture seule",
     "ai.question": "Votre question",

@@ -1156,6 +1156,7 @@ CATALOGUE.update({
     "ai.provider_unavailable": "The provider could not be reached.",
     "ai.provider_rejected": "The provider rejected the request.",
     "ai.provider_bad_response": "The provider returned an invalid response.",
+    "ai.provider_empty_answer": "The provider returned an empty answer.",
     "ai.subtitle": "Ask freely about stock, sales and balances, or about any other subject. Pick the provider and the model for each question.",
     "ai.read_only": "Read-only",
     "ai.question": "Your question",

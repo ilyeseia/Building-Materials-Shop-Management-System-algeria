@@ -106,6 +106,24 @@ def test_provider_failure_falls_back_to_local(app, admin_user, monkeypatch):
     assert result.answer
 
 
+def test_an_empty_provider_answer_is_a_failure_not_a_success(app, admin_user, monkeypatch):
+    app.config.update(
+        AI_PROVIDER="openai",
+        AI_API_KEY="test-key-not-real",
+        AI_BASE_URL="https://provider.test/v1",
+    )
+    monkeypatch.setattr(
+        ai_service, "_chat_completion", lambda messages: '{"answer": "   "}'
+    )
+    with app.test_request_context("/ai"):
+        result = ai_service.ask("ملخص النشاط", admin_user)
+    assert result.status == "unavailable"
+    assert result.error_key == "ai.provider_empty_answer"
+    # The local assistant must supply the real answer, not a generic apology
+    # recorded as if the provider had answered.
+    assert result.answer and "تعذّر بناء" not in result.answer
+
+
 def test_provider_tool_call_and_untrusted_tool_output(app, admin_user, product, monkeypatch):
     app.config.update(AI_PROVIDER="openai", AI_API_KEY="test-key-not-real")
     seen: list[list[dict]] = []
@@ -124,9 +142,17 @@ def test_provider_tool_call_and_untrusted_tool_output(app, admin_user, product, 
     assert result.status == "ok"
     assert result.provider == "openai"
     assert result.tool_calls[0]["tool"] == "search_products"
-    # The second provider call must include the untrusted tool output as a tool role.
+    # The second provider call must carry the untrusted tool output as an
+    # ordinary user turn.  A ``tool`` role without an OpenAI ``tool_call_id``
+    # is rejected by OpenRouter, and the pseudo-protocol here is plain JSON.
     roles = [message["role"] for message in seen[1]]
-    assert "system" in roles and "tool" in roles
+    assert "system" in roles and "tool" not in roles
+    tool_turn = [
+        message["content"]
+        for message in seen[1]
+        if message["role"] == "user" and "TOOL RESULT" in message["content"]
+    ]
+    assert tool_turn and "search_products" in tool_turn[0]
     system_prompt = next(message["content"] for message in seen[0] if message["role"] == "system")
     assert "untrusted data" in system_prompt
     assert "never" in system_prompt.lower()

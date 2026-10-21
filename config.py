@@ -166,6 +166,8 @@ class Config:
     AI_TIMEOUT_SECONDS = _int_env("AI_TIMEOUT_SECONDS", 20)
     AI_MAX_QUESTION_CHARS = _int_env("AI_MAX_QUESTION_CHARS", 1000)
     AI_MAX_TOOL_ROUNDS = _int_env("AI_MAX_TOOL_ROUNDS", 3)
+    #: Enough room for a complete JSON answer (reasoning tokens included).
+    AI_MAX_OUTPUT_TOKENS = _int_env("AI_MAX_OUTPUT_TOKENS", 1200)
     #: Requests per user per hour for the workspace ask endpoint.
     AI_RATE_LIMIT_PER_HOUR = _int_env("AI_RATE_LIMIT_PER_HOUR", 30)
 

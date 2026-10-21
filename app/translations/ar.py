@@ -1139,6 +1139,7 @@ CATALOGUE.update({
     "ai.provider_unavailable": "تعذّر الوصول إلى المزوّد.",
     "ai.provider_rejected": "رفض المزوّد الطلب.",
     "ai.provider_bad_response": "أعاد المزوّد رداً غير صالح.",
+    "ai.provider_empty_answer": "أعاد المزوّد إجابة فارغة.",
     "ai.subtitle": "اسأل بحرية عن المخزون والمبيعات والأرصدة، أو عن أي موضوع آخر. اختر المزوّد والنموذج لكل سؤال.",
     "ai.read_only": "قراءة فقط",
     "ai.question": "سؤالك",
