@@ -247,6 +247,33 @@ def test_no_template_uses_an_inline_event_handler():
     assert offenders == []
 
 
+def test_every_post_form_carries_a_csrf_token():
+    """A form without a CSRF field is rejected with a 400.
+
+    ``{{ csrf_token() }}`` on its own renders the token as *text*, not as an
+    input, so the field has to be a hidden input.  A WTForms form carries its
+    own token through ``form.hidden_tag()``.
+    """
+    form_pattern = re.compile(
+        r"<form\b[^>]*method=[\"']post[\"'][^>]*>(.*?)</form>", re.IGNORECASE | re.DOTALL
+    )
+    offenders = []
+    for path in TEMPLATES.rglob("*.html"):
+        text = path.read_text(encoding="utf-8")
+        for match in form_pattern.finditer(text):
+            body = match.group(1)
+            if 'name="csrf_token"' in body:
+                continue
+            if "hidden_tag" in body:
+                # A WTForms form renders its own token.
+                continue
+            if "{{ csrf_token() }}" in body:
+                offenders.append(f"{path.name}: bare csrf_token()")
+                continue
+            offenders.append(f"{path.name}: no csrf_token field")
+    assert offenders == []
+
+
 def test_session_cookie_flags(client, make_user):
     make_user("admin", Role.ADMIN, password="Karim-2026-Ok")
     db.session.commit()

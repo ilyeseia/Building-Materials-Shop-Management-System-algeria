@@ -110,18 +110,18 @@
                 <a class="btn small secondary" href="{{ url_for('ai.provider_edit', provider_id=provider.id) }}">{{ t('action.edit') }}</a>
                 <a class="btn small secondary" href="{{ url_for('ai.models', provider=provider.id) }}">{{ t('ai.models_title') }}</a>
                 <form method="post" action="{{ url_for('ai.provider_test', provider_id=provider.id) }}" class="inline">
-                  {{ csrf_token() }}
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn small secondary" type="submit">{{ t('ai.test_connection') }}</button>
                 </form>
                 {% if not provider.is_default %}
                 <form method="post" action="{{ url_for('ai.provider_default', provider_id=provider.id) }}" class="inline">
-                  {{ csrf_token() }}
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn small" type="submit">{{ t('ai.make_default') }}</button>
                 </form>
                 {% endif %}
                 <form method="post" action="{{ url_for('ai.provider_delete', provider_id=provider.id) }}" class="inline"
                       data-confirm="{{ t('ai.confirm_delete_provider') }}">
-                  {{ csrf_token() }}
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn small danger" type="submit">{{ t('action.delete') }}</button>
                 </form>
               </div>

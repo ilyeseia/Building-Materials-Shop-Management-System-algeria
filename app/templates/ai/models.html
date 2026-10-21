@@ -80,14 +80,14 @@
               <div class="row-actions">
                 <a class="btn small secondary" href="{{ url_for('ai.model_edit', model_id=model.id) }}">{{ t('action.edit') }}</a>
                 <form method="post" action="{{ url_for('ai.model_toggle', model_id=model.id) }}" class="inline">
-                  {{ csrf_token() }}
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn small secondary" type="submit">
                     {{ t('common.deactivate') if model.is_active else t('common.activate') }}
                   </button>
                 </form>
                 <form method="post" action="{{ url_for('ai.model_delete', model_id=model.id) }}" class="inline"
                       data-confirm="{{ t('ai.confirm_delete_model') }}">
-                  {{ csrf_token() }}
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn small danger" type="submit">{{ t('action.delete') }}</button>
                 </form>
               </div>

@@ -518,3 +518,38 @@ def test_the_workspace_shows_the_active_provider(auth_client, app):
     response = auth_client.get("/ai")
     assert response.status_code == 200
     assert translate("ai.provider_local", language="ar").encode("utf-8") in response.data
+
+
+def test_the_delete_button_sends_a_usable_csrf_token(app, auth_client):
+    """The delete form must really send a CSRF field.
+
+    ``{{ csrf_token() }}`` on its own renders the token as text, so the POST
+    is rejected with a 400.  This test runs with CSRF switched on, exactly
+    like production.
+    """
+    import re
+
+    auth_client.post("/ai/providers/new", data={
+        "catalog_code": "groq", "code": "csrf_provider", "name": "Groq",
+        "base_url": "https://api.groq.com/openai/v1", "api_key": "k", "is_active": "y",
+    }, follow_redirects=True)
+    provider = ai_providers.get_provider_by_code("csrf_provider")
+    assert provider is not None
+
+    app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        page = auth_client.get("/ai/providers").data.decode("utf-8", "replace")
+        match = re.search(
+            r'name="csrf_token"[^>]*value="([^"]+)"', page
+        )
+        assert match is not None, "the delete form has no CSRF field"
+        response = auth_client.post(
+            f"/ai/providers/{provider.id}/delete",
+            data={"csrf_token": match.group(1)},
+        )
+        assert response.status_code != 400, "the delete POST was rejected"
+    finally:
+        app.config["WTF_CSRF_ENABLED"] = False
+
+    db.session.expire_all()
+    assert ai_providers.get_provider_by_code("csrf_provider") is None

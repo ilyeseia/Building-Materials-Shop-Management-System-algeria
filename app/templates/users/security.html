@@ -16,6 +16,7 @@
         {{ icon('check-circle') }} {{ t('users.totp_enabled') }}
       </div>
       <form method="post" class="form" data-confirm="{{ t('users.confirm_disable_totp') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="action" value="disable_totp">
         <button type="submit" class="btn danger">{{ icon('shield-off') }} {{ t('users.disable_totp') }}</button>
       </form>
@@ -29,6 +30,7 @@
           <p class="muted small">{{ t('users.totp_secret_label') }} <code>{{ session.get('_totp_secret_display', '••••••••••••••••') }}</code></p>
         </div>
         <form method="post" class="form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="action" value="verify_totp">
           {{ field(form.totp_code) if form is defined else '' }}
           <input type="text" name="totp_code" placeholder="{{ t('auth.totp_code') }}" required maxlength="6" pattern="\d{6}" class="input" style="text-align:center; letter-spacing: 0.5em;">
@@ -47,6 +49,7 @@
         {% endif %}
       {% else %}
         <form method="post" class="form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="action" value="enable_totp">
           <button type="submit" class="btn primary">{{ icon('shield') }} {{ t('users.enable_totp') }}</button>
         </form>
@@ -57,6 +60,7 @@
   <section class="card">
     <h2>{{ t('users.active_sessions') }}</h2>
     <form method="post" class="form" style="margin-bottom: 1rem;" data-confirm="{{ t('users.confirm_revoke_all') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="revoke_all">
       <button type="submit" class="btn secondary">
         {{ icon('log-out') }} {{ t('users.revoke_all_sessions') }}
