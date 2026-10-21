@@ -15,7 +15,7 @@
       <div class="alert success">
         {{ icon('check-circle') }} {{ t('users.totp_enabled') }}
       </div>
-      <form method="post" class="form" onsubmit="return confirm('{{ t('users.confirm_disable_totp') }}');">
+      <form method="post" class="form" data-confirm="{{ t('users.confirm_disable_totp') }}">
         <input type="hidden" name="action" value="disable_totp">
         <button type="submit" class="btn danger">{{ icon('shield-off') }} {{ t('users.disable_totp') }}</button>
       </form>
@@ -56,9 +56,9 @@
 
   <section class="card">
     <h2>{{ t('users.active_sessions') }}</h2>
-    <form method="post" class="form" style="margin-bottom: 1rem;">
+    <form method="post" class="form" style="margin-bottom: 1rem;" data-confirm="{{ t('users.confirm_revoke_all') }}">
       <input type="hidden" name="action" value="revoke_all">
-      <button type="submit" class="btn secondary" onclick="return confirm('{{ t('users.confirm_revoke_all') }}');">
+      <button type="submit" class="btn secondary">
         {{ icon('log-out') }} {{ t('users.revoke_all_sessions') }}
       </button>
     </form>

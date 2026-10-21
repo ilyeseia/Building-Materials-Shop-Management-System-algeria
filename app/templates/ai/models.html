@@ -14,7 +14,7 @@
     </div>
     <div class="form-actions">
       <form method="get" class="inline">
-        <select name="provider" onchange="this.form.submit()">
+        <select name="provider" data-autosubmit>
           <option value="">{{ t('ai.all_providers') }}</option>
           {% for provider in providers %}
             <option value="{{ provider.id }}" {{ 'selected' if selected_provider == provider.id }}>
@@ -86,7 +86,7 @@
                   </button>
                 </form>
                 <form method="post" action="{{ url_for('ai.model_delete', model_id=model.id) }}" class="inline"
-                      onsubmit="return confirm('{{ t('ai.confirm_delete_model') }}');">
+                      data-confirm="{{ t('ai.confirm_delete_model') }}">
                   {{ csrf_token() }}
                   <button class="btn small danger" type="submit">{{ t('action.delete') }}</button>
                 </form>

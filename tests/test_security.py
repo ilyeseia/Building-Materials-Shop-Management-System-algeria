@@ -225,6 +225,28 @@ def test_the_strict_csp_holds_because_nothing_is_loaded_from_a_cdn():
     assert offenders == []
 
 
+def test_no_template_uses_an_inline_event_handler():
+    """``script-src 'self'`` blocks inline handlers, so they silently do nothing.
+
+    A delete button guarded by ``onsubmit="return confirm(...)"`` would be
+    submitted without asking.  The application uses ``data-confirm`` and
+    ``data-autosubmit`` instead, which ``app.js`` handles.
+    """
+    pattern = re.compile(r"<[^>]+\son[a-z]+\s*=", re.IGNORECASE)
+    offenders = []
+    for path in TEMPLATES.rglob("*.html"):
+        text = path.read_text(encoding="utf-8")
+        for match in pattern.finditer(text):
+            # ``data-confirm`` and ``data-autosubmit`` are attributes, not
+            # event handlers; the pattern only matches a real ``on*`` handler.
+            attribute = match.group(0)
+            name = re.search(r"\son([a-z]+)\s*=", attribute, re.IGNORECASE)
+            if not name:
+                continue
+            offenders.append(f"{path.name}: {attribute.strip()[:80]}")
+    assert offenders == []
+
+
 def test_session_cookie_flags(client, make_user):
     make_user("admin", Role.ADMIN, password="Karim-2026-Ok")
     db.session.commit()
