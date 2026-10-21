@@ -35,7 +35,7 @@ verified pre-update backup.
 | Performance | **PARTIAL** | N+1 removed: dashboard 1,014→16 queries (SQLite 993→101 ms p50; MySQL 130.6 ms p50); receivables 1,003→4 (MySQL 147.3 ms); sales list 139→4; query-count regression tests | Not concurrent and not a write-path load test |
 | Production deployment of this release | **PASS** | Deployed 2026-10-21 to commit `82334a9`: pre-update backup `bmshop-20261021-071417` verified in isolation (52/52 tables, revision `b2c3d4e5f6a7`, 180 FKs, CHECK TABLE pass); migration `c3d4e5f6a7b8` applied non-destructively (55 tables, 183 FKs); image rebuilt and container recreated with labels `1.1.0 / 82334a9`; both containers healthy; `/healthz` 200, login 200, 16 authenticated pages 200; `flask doctor` 11 PASS / 1 WARN; products=2 and users=2 preserved; post-deploy backup `bmshop-20261021-072223` verified (55/55, revision `c3d4e5f6a7b8`) | Rollback path is the downgrade tested on a disposable MySQL scratch DB, not yet exercised against live production |
 | Enterprise IAM subsystem | **PASS** | Migration `c3d4e5f6a7b8` applied; role/session/profile/security/audit pages 200 on the deployed app; functional test creates a custom role, creates a user with it, verifies the permission set, verifies the AI tool list is filtered, creates and revokes a session, and confirms the revocation is audited; 257 local tests pass | Playwright browser rendering of the new pages is NOT TESTED; the admin password was reset during deployment (see section 5) |
-| Public TLS access | **BLOCKED** | Local `curl` and older Chromium 1179 succeed; branded Chrome and server-side `curl` fail with TLS/connection errors; certificate chain inspected but root cause unknown | Needs TLS/ALPN/client comparison before any proxy change |
+| Public TLS access | **BLOCKED** | Application side is healthy: the host port `127.0.0.1:8090` answers `/login` and `/healthz` with 200 on every attempt, and the `tsdproxy` container is up and healthy.  The public Funnel path is intermittent: 12 rapid requests to the public `/login` on 2026-10-21 returned 5 × 200 and 7 × connection failures, while the same URL succeeded on 4 of 5 earlier attempts.  This is the pre-existing, still-unresolved TLS/ALPN problem and is **not** caused by the 2026-10-21 deployment. | Needs a TLS/ALPN/client comparison between Tailscale Funnel, tsdproxy and the client before any proxy change |
 | Off-site backup / PITR | **BLOCKED** | Scripts exist and are guarded | No destination, credentials, binlog retention or restore drill |
 
 ---
@@ -211,7 +211,7 @@ Anything left unchecked above is **not** claimed as complete.
 | Container | Recreated; `app` and `db` both **healthy** |
 | `flask doctor` | 11 PASS / 1 WARN (the pre-existing Arabic-PDF-font warning) |
 | Unauthenticated endpoints | `/healthz` 200, `/login` 200, `/` 302 to login |
-| Public HTTPS | `https://building-materials-shop-management-system.tail7d68dd.ts.net/healthz` 200, `/login` 200, HSTS + CSP + nosniff + DENY + same-origin headers present |
+| Public HTTPS | `https://building-materials-shop-management-system.tail7d68dd.ts.net/healthz` and `/login` respond 200 when the Funnel path is reachable, with HSTS + CSP + nosniff + DENY + same-origin headers present; the path is intermittent (5 of 12 requests succeeded) — see the public TLS row above |
 | Preserved data | products=2, users=2, audit events preserved (57 → 67, the growth is the verification logins) |
 | Post-deploy backup | `bmshop-20261021-072223` — verified in isolation: 55/55 tables, revision `c3d4e5f6a7b8`, 183 FKs, CHECK TABLE pass |
 
