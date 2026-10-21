@@ -14,10 +14,13 @@ encrypted and are never rendered, logged or audited in clear.
 """
 from __future__ import annotations
 
+import json
+
 from flask import (
     Blueprint,
     abort,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -27,7 +30,7 @@ from flask import (
 from config import Config
 from app.extensions import db
 from app.forms import AIQuestionForm, AIProviderForm, AIModelForm
-from app.i18n import translate
+from app.i18n import format_datetime, translate
 from app.security import rate_limit, requires
 from app.services import ai as ai_service
 from app.services import ai_keys, ai_providers
@@ -54,9 +57,19 @@ def ask():
         abort(404)
     form = AIQuestionForm()
     if not form.validate_on_submit():
-        for field_errors in form.errors.values():
-            for error in field_errors:
-                flash(translate(error) if "." in str(error) else str(error), "danger")
+        messages = [
+            translate(error) if "." in str(error) else str(error)
+            for field_errors in form.errors.values()
+            for error in field_errors
+        ]
+        if _wants_json():
+            return jsonify(
+                ok=False,
+                message=messages[0] if messages else translate("ai.error"),
+                errors=messages,
+            ), 400
+        for message in messages:
+            flash(message, "danger")
         return redirect(url_for("ai.index"))
     return _answer(form)
 
@@ -64,12 +77,20 @@ def ask():
 def _answer(form: AIQuestionForm):
     if not ai_service.is_enabled():
         abort(404)
+    wants_json = _wants_json()
+    notices: list[dict[str, str]] = []
+
+    def notify(category: str, message: str) -> None:
+        notices.append({"category": category, "message": message})
+        if not wants_json:
+            flash(message, category)
+
     question = form.question.data or ""
     user = _current_user()
     target_key = (form.target.data or "").strip() or ai_service.AUTO_TARGET
     known = {option["key"] for option in ai_service.target_options()}
     if target_key not in known and target_key not in {ai_service.AUTO_TARGET, ai_service.LOCAL_TARGET}:
-        flash(translate("ai.target_missing"), "warning")
+        notify("warning", translate("ai.target_missing"))
         target_key = ai_service.AUTO_TARGET
     try:
         result = ai_service.ask(
@@ -83,6 +104,8 @@ def _answer(form: AIQuestionForm):
         db.session.commit()
     except BusinessError as error:
         db.session.rollback()
+        if wants_json:
+            return jsonify(ok=False, message=error.message()), 400
         flash(error.message(), "danger")
         return redirect(url_for("ai.index"))
     except Exception:  # noqa: BLE001 - provider/DB failure must not 500 the workspace
@@ -90,25 +113,34 @@ def _answer(form: AIQuestionForm):
         from flask import current_app
 
         current_app.logger.exception("AI workspace failed to answer a question")
+        if wants_json:
+            return jsonify(ok=False, message=translate("ai.error")), 500
         flash(translate("ai.error"), "danger")
         return redirect(url_for("ai.index"))
 
     if result.status == ai_service.AI_STATUS_UNAVAILABLE:
         if result.error_key == "ai.general_needs_provider":
-            flash(translate("ai.general_needs_provider"), "warning")
+            notify("warning", translate("ai.general_needs_provider"))
         else:
-            flash(translate("ai.provider_fallback"), "warning")
+            notify("warning", translate("ai.provider_fallback"))
             if result.error_detail and _can_manage():
-                flash(
+                notify(
+                    "danger",
                     translate(
                         "ai.provider_fallback_detail",
                         provider=result.error_provider or translate("ai.provider_external"),
                         detail=result.error_detail[:300],
                     ),
-                    "danger",
                 )
     elif result.status == ai_service.AI_STATUS_REFUSED:
-        flash(result.answer, "warning")
+        notify("warning", result.answer)
+
+    if wants_json:
+        return jsonify(
+            ok=True,
+            interaction=_interaction_payload(interaction),
+            notices=notices,
+        )
     return redirect(url_for("ai.index", interaction=interaction.id))
 
 
@@ -125,6 +157,52 @@ def _can_manage() -> bool:
     from app.security import has_permission
 
     return has_permission(_current_user(), "ai.manage")
+
+
+def _wants_json() -> bool:
+    """Whether the fetch-based composer is driving this POST.
+
+    The no-JavaScript form sends a normal HTML ``Accept`` header and keeps the
+    redirect/flash behaviour.  The browser composer asks for JSON explicitly, so
+    the same route can answer in place without a page reload.
+    """
+    return (
+        request.headers.get("X-Requested-With") == "fetch"
+        or request.accept_mimetypes.best == "application/json"
+    )
+
+
+def _tool_calls(row) -> list:
+    value = row.tool_calls or []
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError):
+            return []
+    return value if isinstance(value, list) else []
+
+
+def _interaction_payload(row) -> dict:
+    """Safe fields for the in-place answer; never includes a credential."""
+    return {
+        "id": row.id,
+        "question": row.question or "",
+        "answer": row.answer or "",
+        "status": row.status,
+        "status_label": translate("ai.status." + row.status),
+        "status_class": (
+            "confirmed" if row.status == ai_service.AI_STATUS_OK
+            else "warning" if row.status == ai_service.AI_STATUS_UNAVAILABLE
+            else "failed"
+        ),
+        "provider": row.provider or "",
+        "model": row.model or "",
+        "latency_ms": row.latency_ms,
+        "created_at": format_datetime(row.created_at),
+        "tool_calls": _tool_calls(row),
+        # The scrubbed provider message is already manager-only on the page.
+        "error_detail": (row.error_detail or "") if _can_manage() else "",
+    }
 
 
 def _render(form: AIQuestionForm):

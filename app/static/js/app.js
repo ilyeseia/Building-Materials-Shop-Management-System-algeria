@@ -234,6 +234,163 @@
     });
   }
 
+  /* ----- AI composer: answer in place, without a page reload ------------ */
+  function setupAiComposer() {
+    var form = document.querySelector("form[data-ai-form]");
+    if (!form || !window.fetch || !window.FormData) return;
+
+    var submit = form.querySelector("[data-ai-submit]");
+    var pending = form.querySelector("[data-ai-pending]");
+    var textarea = form.querySelector("textarea[name='question']");
+    var latest = document.getElementById("ai-latest");
+    var notices = document.querySelector("[data-ai-notices]");
+    var thread = document.querySelector("[data-ai-thread]");
+    var historyEmpty = document.querySelector("[data-ai-history-empty]");
+    var answerTemplate = document.getElementById("ai-answer-template");
+    var turnTemplate = document.getElementById("ai-turn-template");
+    var flashTemplate = document.getElementById("ai-flash-template");
+    if (!latest || !answerTemplate || !turnTemplate || !flashTemplate) return;
+
+    var maxTurns = parseInt(form.getAttribute("data-ai-max-turns") || "10", 10);
+    var busy = false;
+
+    function setField(root, name, value) {
+      root.querySelectorAll('[data-ai-field="' + name + '"]').forEach(function (element) {
+        element.textContent = value === null || value === undefined ? "" : String(value);
+      });
+    }
+
+    function showFlash(category, message) {
+      if (!notices) return;
+      var node = flashTemplate.content.firstElementChild.cloneNode(true);
+      node.classList.add(category || "info");
+      if (category === "danger" || category === "error") node.setAttribute("role", "alert");
+      setField(node, "message", message);
+      var close = node.querySelector("[data-flash-close]");
+      if (close) {
+        close.addEventListener("click", function () { node.remove(); });
+      }
+      notices.appendChild(node);
+    }
+
+    function showError(message) {
+      showFlash("danger", message);
+      if (notices && notices.scrollIntoView) notices.scrollIntoView({ block: "nearest" });
+    }
+
+    function updateLatest(data) {
+      var card = answerTemplate.content.firstElementChild.cloneNode(true);
+      var badge = card.querySelector('[data-ai-field="status_label"]');
+      if (badge) badge.classList.add(data.status_class || "confirmed");
+      setField(card, "created_at", data.created_at);
+      setField(card, "status_label", data.status_label);
+      setField(
+        card,
+        "provider_line",
+        (data.provider || "") + (data.model ? " / " + data.model : "")
+      );
+      var latency = card.querySelector("[data-ai-latency]");
+      if (latency && data.latency_ms) {
+        latency.hidden = false;
+        setField(card, "latency", data.latency_ms);
+      }
+      setField(card, "answer", data.answer);
+      setField(card, "question", data.question);
+      var errorDetails = card.querySelector("[data-ai-error-details]");
+      if (errorDetails && data.error_detail) {
+        errorDetails.hidden = false;
+        setField(card, "error_detail", data.error_detail);
+      }
+      var toolDetails = card.querySelector("[data-ai-tool-details]");
+      var calls = Array.isArray(data.tool_calls) ? data.tool_calls : [];
+      if (toolDetails && calls.length) {
+        toolDetails.hidden = false;
+        setField(card, "tool_calls", JSON.stringify(calls, null, 2));
+      }
+      latest.textContent = "";
+      latest.appendChild(card);
+    }
+
+    function addTurn(data) {
+      if (!thread) return;
+      var turn = turnTemplate.content.firstElementChild.cloneNode(true);
+      var badge = turn.querySelector('[data-ai-field="status_label"]');
+      if (badge) badge.classList.add(data.status_class || "confirmed");
+      setField(turn, "question", data.question);
+      setField(turn, "status_label", data.status_label);
+      setField(turn, "created_at", data.created_at);
+      setField(turn, "answer", data.answer);
+      setField(
+        turn,
+        "meta",
+        (data.provider || "") + (data.model ? " / " + data.model : "") +
+          (data.latency_ms ? " · " + data.latency_ms + " ms" : "")
+      );
+      thread.hidden = false;
+      thread.insertBefore(turn, thread.firstElementChild);
+      while (maxTurns > 0 && thread.children.length > maxTurns) {
+        thread.removeChild(thread.lastElementChild);
+      }
+      if (historyEmpty) historyEmpty.hidden = true;
+    }
+
+    function readPayload(response) {
+      return response.json().catch(function () { return null; }).then(function (payload) {
+        var fallback = (payload && (payload.message || payload.error)) ||
+          form.getAttribute("data-ai-error") || "";
+        if (!response.ok || !payload || payload.ok !== true || !payload.interaction) {
+          throw new Error(fallback);
+        }
+        return payload;
+      });
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (busy) return;
+      busy = true;
+      if (notices) notices.textContent = "";
+      if (pending) pending.hidden = false;
+      if (submit) submit.disabled = true;
+      form.setAttribute("aria-busy", "true");
+
+      window.fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "Accept": "application/json", "X-Requested-With": "fetch" },
+        credentials: "same-origin"
+      }).catch(function () {
+        throw new Error(form.getAttribute("data-ai-network-error") || "");
+      }).then(readPayload).then(function (payload) {
+        updateLatest(payload.interaction);
+        addTurn(payload.interaction);
+        (payload.notices || []).forEach(function (notice) {
+          showFlash(notice.category || "info", notice.message || "");
+        });
+        if (window.history && window.history.replaceState) {
+          var url = new URL(window.location.href);
+          url.searchParams.set("interaction", payload.interaction.id);
+          window.history.replaceState({}, "", url.toString());
+        }
+        if (textarea) {
+          textarea.value = "";
+          textarea.dispatchEvent(new Event("input"));
+          textarea.focus();
+        }
+        if (latest.scrollIntoView) {
+          latest.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }).catch(function (error) {
+        showError((error && error.message) || form.getAttribute("data-ai-error") || "");
+      }).finally(function () {
+        busy = false;
+        if (pending) pending.hidden = true;
+        if (submit) submit.disabled = false;
+        form.setAttribute("aria-busy", "false");
+      });
+    });
+  }
+
   function setupPaymentToggle() {
     var direction = document.getElementById("direction-field");
     if (!direction) return;
@@ -368,6 +525,7 @@
     setupPrint();
     setupAutoSubmit();
     setupAskBox();
+    setupAiComposer();
     setupPaymentToggle();
     setupTheme();
     setupNav();

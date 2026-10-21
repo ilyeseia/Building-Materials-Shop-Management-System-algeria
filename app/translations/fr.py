@@ -1104,6 +1104,8 @@ CATALOGUE.update({
     "ai.question_placeholder": "Écrivez votre question… vous pouvez poursuivre la conversation.",
     "ai.try": "Suggestions :",
     "ai.send_hint": "Ctrl+Entrée pour envoyer",
+    "ai.thinking": "Réflexion…",
+    "ai.network_error": "Connexion au serveur impossible. Vérifiez le réseau puis réessayez.",
     "ai.current_assistant": "Assistant actuel",
     "ai.targets_available": "{count} modèle(s) disponible(s)",
     "ai.suggest.low_stock": "Quel est le stock faible ?",

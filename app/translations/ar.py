@@ -1119,6 +1119,8 @@ CATALOGUE.update({
     "ai.question_placeholder": "اكتب سؤالك هنا… يمكنك متابعة المحادثة بسؤال آخر.",
     "ai.try": "اقتراحات:",
     "ai.send_hint": "Ctrl+Enter للإرسال",
+    "ai.thinking": "جارٍ التفكير…",
+    "ai.network_error": "تعذّر الاتصال بالخادم. تحقّق من الشبكة ثم أعد المحاولة.",
     "ai.current_assistant": "المساعد الحالي",
     "ai.targets_available": "{count} نموذج متاح",
     "ai.suggest.low_stock": "ما هو المخزون المنخفض؟",

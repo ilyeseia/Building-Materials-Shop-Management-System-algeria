@@ -87,6 +87,79 @@ def test_ask_route_records_interaction_and_audit(auth_client, app, product):
         assert db.session.query(Product).count() == before_products
 
 
+def test_ask_route_can_answer_without_a_redirect(auth_client, app):
+    """The fetch composer gets JSON so the answer can replace the card in place."""
+    response = auth_client.post(
+        "/ai/ask",
+        data={"question": "ملخص النشاط"},
+        headers={"Accept": "application/json", "X-Requested-With": "fetch"},
+    )
+    assert response.status_code == 200
+    assert response.is_json
+    payload = response.get_json()
+    assert payload["ok"] is True
+    interaction = payload["interaction"]
+    assert interaction["id"]
+    assert interaction["status"] == "ok"
+    assert interaction["answer"]
+    assert interaction["status_label"]
+    assert interaction["status_class"] == "confirmed"
+    assert interaction["error_detail"] == ""
+    assert isinstance(interaction["tool_calls"], list)
+    assert payload["notices"] == []
+    with app.app_context():
+        assert db.session.query(AIInteraction).count() == 1
+
+
+def test_ask_route_returns_json_for_an_empty_question(auth_client):
+    response = auth_client.post(
+        "/ai/ask",
+        data={"question": ""},
+        headers={"Accept": "application/json", "X-Requested-With": "fetch"},
+    )
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["ok"] is False
+    assert payload["message"]
+
+
+def test_ask_json_reports_a_provider_fallback(auth_client, monkeypatch):
+    fallback = ai_service.AssistantResult(
+        answer="إجابة محلية",
+        status=ai_service.AI_STATUS_UNAVAILABLE,
+        provider="local",
+        error_key="ai.provider_unavailable",
+        error_detail="HTTP 502: provider down",
+        error_provider="OpenRouter",
+    )
+    monkeypatch.setattr(ai_service, "ask", lambda *args, **kwargs: fallback)
+    response = auth_client.post(
+        "/ai/ask",
+        data={"question": "ملخص النشاط"},
+        headers={"Accept": "application/json", "X-Requested-With": "fetch"},
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["interaction"]["status"] == "unavailable"
+    assert payload["interaction"]["status_class"] == "warning"
+    assert payload["interaction"]["error_detail"] == "HTTP 502: provider down"
+    assert payload["notices"][0]["category"] == "warning"
+    assert payload["notices"][1]["category"] == "danger"
+    assert "HTTP 502" in payload["notices"][1]["message"]
+
+
+def test_ai_page_contains_the_async_composer(auth_client):
+    response = auth_client.get("/ai")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "data-ai-form" in html
+    assert 'id="ai-answer-template"' in html
+    assert 'id="ai-turn-template"' in html
+    assert 'id="ai-flash-template"' in html
+    assert "data-ai-pending" in html
+
+
 def test_provider_failure_falls_back_to_local(app, admin_user, monkeypatch):
     app.config.update(
         AI_PROVIDER="openai",

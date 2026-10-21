@@ -12,9 +12,15 @@
   {% endif %}
 </div>
 
+{#- Async notices from the fetch composer; server-rendered flashes stay above. -#}
+<div class="ai-notices" data-ai-notices aria-live="polite"></div>
+
 {#- The composer: a conversation, not a single fixed question. -#}
 <div class="card ai-composer">
-  <form method="post" action="{{ url_for('ai.ask') }}" data-ai-form>
+  <form method="post" action="{{ url_for('ai.ask') }}" data-ai-form
+        data-ai-error="{{ t('ai.error') }}"
+        data-ai-network-error="{{ t('ai.network_error') }}"
+        data-ai-max-turns="10">
     {{ form.hidden_tag() }}
     <div class="ai-controls">
       <label class="field ai-target-field">
@@ -54,8 +60,12 @@
     </div>
 
     <div class="form-actions">
-      <button class="btn" type="submit">{{ t('ai.ask') }}</button>
+      <button class="btn" type="submit" data-ai-submit>{{ t('ai.ask') }}</button>
       <span class="small muted">{{ t('ai.send_hint') }}</span>
+      <span class="ai-pending" data-ai-pending role="status" hidden>
+        <span class="ai-spinner" aria-hidden="true"></span>
+        {{ t('ai.thinking') }}
+      </span>
       <span class="spacer"></span>
       <span class="small muted ai-status-line">
         <span class="ai-dot" aria-hidden="true"></span>
@@ -86,6 +96,7 @@
 </div>
 
 {% if latest %}
+<div id="ai-latest" aria-live="polite">
 <div class="card ai-answer" id="latest">
   <div class="card-head">
     <div>
@@ -113,6 +124,9 @@
     </details>
   {% endif %}
 </div>
+</div>
+{% else %}
+<div id="ai-latest" aria-live="polite"></div>
 {% endif %}
 
 <div class="card">
@@ -122,24 +136,72 @@
       <p class="small muted">{{ t('ai.history_help') }}</p>
     </div>
   </div>
-  {% if history %}
-    <ol class="ai-thread">
-      {% for row in history %}
-      <li class="ai-turn">
-        <details {{ 'open' if latest and row.id == latest.id }}>
-          <summary>
-            <span class="ai-turn-question">{{ row.question }}</span>
-            <span class="badge {{ 'confirmed' if row.status == 'ok' else ('warning' if row.status == 'unavailable' else 'failed') }}">{{ t('ai.status.' + row.status) }}</span>
-            <span class="small muted nowrap">{{ row.created_at | dt }}</span>
-          </summary>
-          <p class="answer-body">{{ row.answer }}</p>
-          <p class="small muted mono">{{ row.provider }}{% if row.model %} / {{ row.model }}{% endif %}{% if row.latency_ms %} · {{ row.latency_ms }} ms{% endif %}</p>
-        </details>
-      </li>
-      {% endfor %}
-    </ol>
-  {% else %}
+  <ol class="ai-thread" data-ai-thread {% if not history %}hidden{% endif %}>
+    {% for row in history %}
+    <li class="ai-turn">
+      <details {{ 'open' if latest and row.id == latest.id }}>
+        <summary>
+          <span class="ai-turn-question">{{ row.question }}</span>
+          <span class="badge {{ 'confirmed' if row.status == 'ok' else ('warning' if row.status == 'unavailable' else 'failed') }}">{{ t('ai.status.' + row.status) }}</span>
+          <span class="small muted nowrap">{{ row.created_at | dt }}</span>
+        </summary>
+        <p class="answer-body">{{ row.answer }}</p>
+        <p class="small muted mono">{{ row.provider }}{% if row.model %} / {{ row.model }}{% endif %}{% if row.latency_ms %} · {{ row.latency_ms }} ms{% endif %}</p>
+      </details>
+    </li>
+    {% endfor %}
+  </ol>
+  <div data-ai-history-empty {% if history %}hidden{% endif %}>
     {{ empty_state(t('ai.no_history')) }}
-  {% endif %}
+  </div>
 </div>
+
+{#- Inert markup the fetch composer clones; labels are translated server-side,
+    so no message text lives in JavaScript. -#}
+<template id="ai-answer-template">
+  <div class="card ai-answer" id="latest">
+    <div class="card-head">
+      <div>
+        <h2>{{ t('ai.answer') }}</h2>
+        <p class="small muted">
+          <span data-ai-field="created_at"></span> ·
+          <span class="badge" data-ai-field="status_label"></span>
+          <span class="mono" data-ai-field="provider_line"></span>
+          <span data-ai-latency hidden> · <span data-ai-field="latency"></span> ms</span>
+        </p>
+      </div>
+    </div>
+    <p class="answer-body" data-ai-field="answer"></p>
+    <details class="ai-error" data-ai-error-details hidden>
+      <summary>{{ t('ai.provider_error') }}</summary>
+      <p class="small mono" data-ai-field="error_detail"></p>
+    </details>
+    <p class="small muted ai-question-echo">{{ t('ai.question') }}: <span data-ai-field="question"></span></p>
+    <details data-ai-tool-details hidden>
+      <summary>{{ t('ai.tool_calls') }}</summary>
+      <pre class="mono small" data-ai-field="tool_calls"></pre>
+    </details>
+  </div>
+</template>
+
+<template id="ai-turn-template">
+  <li class="ai-turn">
+    <details open>
+      <summary>
+        <span class="ai-turn-question" data-ai-field="question"></span>
+        <span class="badge" data-ai-field="status_label"></span>
+        <span class="small muted nowrap" data-ai-field="created_at"></span>
+      </summary>
+      <p class="answer-body" data-ai-field="answer"></p>
+      <p class="small muted mono" data-ai-field="meta"></p>
+    </details>
+  </li>
+</template>
+
+<template id="ai-flash-template">
+  <div class="flash" role="status">
+    <span data-ai-field="message"></span>
+    <button class="flash-close" type="button" data-flash-close aria-label="{{ t('action.close') }}">×</button>
+  </div>
+</template>
 {% endblock %}
