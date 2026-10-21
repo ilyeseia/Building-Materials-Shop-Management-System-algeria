@@ -5,15 +5,15 @@ This is the authoritative status of the current release work.  It separates
 `PASS`, `PARTIAL`, `FAIL`, `NOT TESTED` and `BLOCKED`.
 
 **Source version:** `1.1.0` (`VERSION`)  
-**Deployed commit:** `54e54f5` (pushed to the `algeria` remote)  
-**Database revision:** `c3d4e5f6a7b8` (head), 55 tables / 183 foreign keys  
-**Local suite:** **266 passed, 0 failed, 0 skipped** in 171.27 s (229 original +
-28 IAM frontend tests + 9 logout tests)  
-**Production before this deployment:** image from `cc5ed50`, database
-`b2c3d4e5f6a7`, 52 tables, 180 foreign keys, existing rows preserved.  
+**Deployed commit:** `670781b` (pushed to the `algeria` remote)  
+**Database revision:** `d4e5f6a7b8c9` (head), 57 tables / 184 foreign keys  
+**Local suite:** **306 passed, 0 failed, 0 skipped** in 252.12 s (229 original +
+28 IAM frontend tests + 10 logout tests + 39 AI provider tests)  
+**Production before this deployment:** image from `54e54f5`, database
+`c3d4e5f6a7b8`, 55 tables, 183 foreign keys, existing rows preserved.  
 **Migrations applied:** `b2c3d4e5f6a7` (append-only AI interactions + per-business
-`enable_ai`) and `c3d4e5f6a7b8` (Enterprise IAM), non-destructively, each with a
-verified pre-update backup.
+`enable_ai`), `c3d4e5f6a7b8` (Enterprise IAM) and `d4e5f6a7b8c9` (AI provider
+registry), non-destructively, each with a verified pre-update backup.
 
 ---
 
@@ -36,6 +36,7 @@ verified pre-update backup.
 | Production deployment of this release | **PASS** | Deployed 2026-10-21 to commit `82334a9`: pre-update backup `bmshop-20261021-071417` verified in isolation (52/52 tables, revision `b2c3d4e5f6a7`, 180 FKs, CHECK TABLE pass); migration `c3d4e5f6a7b8` applied non-destructively (55 tables, 183 FKs); image rebuilt and container recreated with labels `1.1.0 / 82334a9`; both containers healthy; `/healthz` 200, login 200, 16 authenticated pages 200; `flask doctor` 11 PASS / 1 WARN; products=2 and users=2 preserved; post-deploy backup `bmshop-20261021-072223` verified (55/55, revision `c3d4e5f6a7b8`) | Rollback path is the downgrade tested on a disposable MySQL scratch DB, not yet exercised against live production |
 | Enterprise IAM subsystem | **PASS** | Migration `c3d4e5f6a7b8` applied; role/session/profile/security/audit pages 200 on the deployed app; functional test creates a custom role, creates a user with it, verifies the permission set, verifies the AI tool list is filtered, creates and revokes a session, and confirms the revocation is audited; 266 local tests pass | Playwright browser rendering of the new pages is NOT TESTED; the admin password was reset during deployment (see section 5) |
 | Sign-out ends the session | **PASS (fixed)** | Four defects found and fixed (see section 6).  Verified in a real browser against the deployed app with "remember me" ticked: the `remember_token` cookie is deleted, the dashboard redirects to the login page, and signing in again works.  Verified over real HTTP with a cookie jar as well. | `GET /logout` is still accepted for backward compatibility and is therefore a low-severity forced-logout vector; the application's own UI uses `POST` with a CSRF token |
+| AI provider administration | **PASS** | Migration `d4e5f6a7b8c9` applied (57 tables, 184 FKs); the provider and model pages render on the deployed app; the API key is stored encrypted and never rendered; the catalogue of free-tier OpenAI-compatible gateways is offered; a real browser check passes with 0 console errors and 0 failed HTTP responses (see section 7) | No external provider account is configured, so a real provider call is **NOT TESTED**; the public Funnel path needs the tsdproxy note in section 7.6 |
 | Public TLS access | **BLOCKED** | Application side is healthy: the host port `127.0.0.1:8090` answers `/login` and `/healthz` with 200 on every attempt, and the `tsdproxy` container is up and healthy.  The public Funnel path is intermittent: 12 rapid requests to the public `/login` on 2026-10-21 returned 5 × 200 and 7 × connection failures, while the same URL succeeded on 4 of 5 earlier attempts.  This is the pre-existing, still-unresolved TLS/ALPN problem and is **not** caused by the 2026-10-21 deployment. | Needs a TLS/ALPN/client comparison between Tailscale Funnel, tsdproxy and the client before any proxy change |
 | Off-site backup / PITR | **BLOCKED** | Scripts exist and are guarded | No destination, credentials, binlog retention or restore drill |
 
@@ -291,3 +292,93 @@ page could force a sign-out (a nuisance, not a data leak).  The application's
 own UI uses `POST` with a CSRF token, and `POST` is protected.  Restricting the
 route to `POST` alone was not done because it would change an existing,
 documented behaviour.
+
+---
+
+## 7. AI provider and model administration (deployed 2026-10-21, commit `56bf190`)
+
+The assistant could only talk to one endpoint, fixed by environment variables.
+This release adds a registry an administrator drives from the interface.
+
+### 7.1 The interface
+
+| Page | What it does |
+|---|---|
+| `/ai/providers` | The registered providers, the endpoint currently in use, and a catalogue of known OpenAI-compatible gateways |
+| `/ai/providers/new` | Add a provider: pick a catalogue entry, paste the key, choose the default |
+| `/ai/providers/<id>/edit` | Change the name, the base URL, the key (an empty box keeps the stored one), the active and default flags |
+| `/ai/providers/<id>/test` | Reach the provider, list the models it offers, and report the latency |
+| `/ai/models` | The models of each provider, with the default one per provider |
+| `/ai/models/new`, `/ai/models/<id>/edit` | Register a model identifier, its label, context window, output limit, tool support and free-quota flag |
+
+The catalogue covers the gateways that give a usable quota without a paid
+subscription - OpenRouter (including the `:free` models), Groq, Google AI
+Studio, Mistral, Cerebras, Together AI, SiliconFlow - the paid ones, and the
+runtimes that need no key at all (Ollama, LM Studio).  Each entry lists the
+model identifiers that are known to work and a link to the sign-up page.
+
+### 7.2 How the credential is protected
+
+* The API key is encrypted with **Fernet** (AES-CBC + HMAC-SHA256) using a
+  key derived from `SECRET_KEY` with PBKDF2-HMAC-SHA256 and 200 000 rounds.
+* The plaintext key is never rendered, never logged, never written to the
+  audit trail and never included in an exception message.  Only a four
+  character hint is kept in clear so two keys can be told apart.
+* A rotated `SECRET_KEY` makes a stored key unreadable.  That is reported as
+  "please enter it again" instead of crashing the page.
+* The new `ai.manage` permission is administrator-only, and every create,
+  update, delete, default and test is audited.
+
+### 7.3 How the assistant uses the registry
+
+* The registered providers are tried in order, the default one first; the
+  first that answers wins.  If every one fails, the deterministic local
+  assistant answers and the failure is recorded.
+* The legacy `AI_PROVIDER` / `AI_API_KEY` configuration keeps working and is
+  shown in the interface as the environment provider.
+* The tool list is still filtered by the user's permissions, and the
+  permission is re-checked server-side before every tool call.
+
+### 7.4 Two defects the browser check found
+
+| Defect | Effect |
+|---|---|
+| The delete forms used `{{ csrf_token() }}` on its own.  Flask-WTF renders the token as *text* in that case, so the form carried no `csrf_token` field and every delete was rejected with a **400**. | The delete buttons did nothing.  The four security-page forms (enable, verify and disable 2FA, revoke all sessions) had no CSRF field at all. |
+| The templates used inline event handlers (`onsubmit="return confirm(...)"`, `onchange="this.form.submit()"`).  The strict `script-src 'self'` policy blocks them. | The delete confirmation never appeared and the provider filter did not work; the browser logged CSP violations. |
+
+Both are fixed: the forms send a hidden `csrf_token` input and use the
+`data-confirm` / `data-autosubmit` attributes that `app.js` already handles.
+Two new tests fail the build if either pattern comes back.
+
+### 7.5 Verification
+
+| Check | Result |
+|---|---|
+| New automated tests | 39 in `tests/test_ai_providers.py`; **306 local tests pass** |
+| MySQL scratch migration | The whole chain applied to a disposable MySQL 8 database: 57 tables, 184 foreign keys, CHECK TABLE pass, insert/read works, the delete cascades, and the downgrade and re-upgrade both succeed |
+| Authenticated acceptance on the deployed app | All five new pages 200, the catalogue is listed, a provider is created with the key stored encrypted, the key decrypts back, the key never appears in a page, a model is created, the provider becomes the default, the assistant targets it, and the verification data is removed afterwards |
+| Real browser (Playwright, deployed app) | The catalogue renders, the form pre-fills the base URL, a provider is created, **the key is not in the page**, a model is created, the delete buttons work, zero horizontal overflow at 1440×900, 834×1112 and 390×844, **0 console errors and 0 failed HTTP responses** |
+| Backups | Pre-deploy `bmshop-20261021-095621`, post-deploy `bmshop-20261021-100132` (55+ tables, revision `d4e5f6a7b8c9`, CHECK TABLE pass) |
+| Release identity | `flask version` reports `1.1.0 / 670781b`; `flask doctor` 11 PASS / 1 WARN |
+
+### 7.6 An operational note about the one-off migration container
+
+`docker compose run --rm app flask db upgrade` inherits the service labels,
+including the `tsdproxy.*` ones.  tsdproxy then re-points the public proxy at
+that throw-away container, and the public path breaks with a 502 when the
+container is removed.  The migration was applied that way during the
+validation, and the proxy was restored by recreating the application
+container so that tsdproxy registered it again.
+
+**Use `docker compose exec app flask db upgrade` on a container that already
+runs the new image, or recreate the application container right after a
+one-off run.** This is a host-level tsdproxy behaviour, not an application
+defect.
+
+### 7.7 Remaining for the AI feature
+
+| Item | Status |
+|---|---|
+| A real external provider call | **NOT TESTED** — no provider account is configured on this installation.  The client, the tool loop, the permission re-check and the fallback are all tested with a mocked transport |
+| The `/models` listing against a real gateway | **NOT TESTED** — the code path is implemented and the failure modes are handled, but it was never called against a live provider |
+| Concurrent load with an external provider | **NOT TESTED** |
