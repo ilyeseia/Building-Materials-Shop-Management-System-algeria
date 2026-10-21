@@ -202,6 +202,38 @@
     });
   }
 
+  /* ----- AI workspace: growing box, Ctrl+Enter, prompt chips ------------- */
+  function setupAskBox() {
+    document.querySelectorAll("textarea[data-autogrow]").forEach(function (area) {
+      function grow() {
+        area.style.height = "auto";
+        area.style.height = Math.min(area.scrollHeight + 2, 420) + "px";
+      }
+      area.addEventListener("input", grow);
+      grow();
+    });
+
+    document.querySelectorAll("textarea[data-ctrl-enter]").forEach(function (area) {
+      area.addEventListener("keydown", function (event) {
+        if (!(event.ctrlKey || event.metaKey) || event.key !== "Enter") return;
+        if (!area.form) return;
+        event.preventDefault();
+        if (area.form.requestSubmit) area.form.requestSubmit();
+        else area.form.submit();
+      });
+    });
+
+    document.querySelectorAll("[data-fill-question]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var area = document.querySelector("textarea[name='question']");
+        if (!area) return;
+        area.value = button.getAttribute("data-fill-question") || "";
+        area.focus();
+        area.dispatchEvent(new Event("input"));
+      });
+    });
+  }
+
   function setupPaymentToggle() {
     var direction = document.getElementById("direction-field");
     if (!direction) return;
@@ -335,6 +367,7 @@
     setupConfirm();
     setupPrint();
     setupAutoSubmit();
+    setupAskBox();
     setupPaymentToggle();
     setupTheme();
     setupNav();

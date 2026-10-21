@@ -188,3 +188,139 @@ def test_ai_interaction_model_is_append_only_shape(app, admin_user):
     db.session.commit()
     assert interaction.id
     assert interaction.created_at
+
+
+# ---------------------------------------------------------------------------
+# The flexible workspace: model selection, general mode, follow-ups, errors
+# ---------------------------------------------------------------------------
+
+def test_workspace_is_a_flexible_conversation(auth_client):
+    response = auth_client.get("/ai")
+    assert response.status_code == 200
+    assert b'name="target"' in response.data
+    assert b'name="general_mode"' in response.data
+    assert b"data-fill-question" in response.data
+    assert b"data-autogrow" in response.data
+    # The old "read-only" framing is gone from the visible heading.
+    assert "الأدوات المتاحة للقراءة فقط".encode("utf-8") not in response.data
+
+
+def test_general_mode_uses_the_provider_without_any_tool(app, admin_user, monkeypatch):
+    app.config.update(
+        AI_PROVIDER="openai", AI_API_KEY="test-key", AI_BASE_URL="https://provider.test/v1",
+        AI_MODEL="test-model",
+    )
+    seen: list[list[dict]] = []
+
+    def fake_chat(messages):
+        seen.append(list(messages))
+        return "Bonjour, comment puis-je aider ?"
+
+    monkeypatch.setattr(ai_service, "_chat_completion", fake_chat)
+    with app.test_request_context("/ai"):
+        result = ai_service.ask("Bonjour", admin_user, use_data=False)
+
+    assert result.status == "ok"
+    assert result.provider == "openai"
+    assert result.tool_calls == []
+    system_prompt = seen[0][0]["content"]
+    assert "no access to the shop's data" in system_prompt
+    assert "Available tools" not in system_prompt
+
+
+def test_general_mode_without_a_provider_says_so(app, admin_user):
+    with app.test_request_context("/ai"):
+        result = ai_service.ask("Bonjour", admin_user, use_data=False)
+    assert result.status == "unavailable"
+    assert result.error_key == "ai.general_needs_provider"
+    assert result.answer
+
+
+def test_an_explicit_model_selection_is_honoured(app, admin_user, monkeypatch):
+    from app.services import ai_providers
+
+    with app.test_request_context("/ai"):
+        provider = ai_providers.create_provider(
+            code="chooser", name="Chooser", base_url="https://chooser.test/v1", api_key="sk-x"
+        )
+        first = ai_providers.create_model(provider, code="m1", is_default=True)
+        second = ai_providers.create_model(provider, code="m2", sort_order=1)
+        db.session.commit()
+
+        attempted: list[str] = []
+
+        def fake_chat(_messages):
+            attempted.append(ai_service._PROVIDER_TARGET.get().model)
+            return '{"answer": "ok"}'
+
+        monkeypatch.setattr(ai_service, "_chat_completion", fake_chat)
+        result = ai_service.ask(
+            "anything", admin_user, target_key=f"p{provider.id}:m{second.id}"
+        )
+
+    assert attempted == ["m2"]
+    assert result.model == "m2"
+    assert result.status == "ok"
+    assert first.id != second.id
+
+
+def test_a_rejected_model_reports_the_provider_message(app, admin_user, monkeypatch):
+    from app.services import ai_providers
+
+    with app.test_request_context("/ai"):
+        provider = ai_providers.create_provider(
+            code="rejecting", name="Rejecting", base_url="https://reject.test/v1", api_key="sk-x"
+        )
+        ai_providers.create_model(provider, code="decisions-only")
+        db.session.commit()
+
+        def fail(_messages):
+            raise ai_service.ProviderError(
+                "ai.provider_rejected", "HTTP 400: this is a decisions model"
+            )
+
+        monkeypatch.setattr(ai_service, "_chat_completion", fail)
+        result = ai_service.ask("ملخص النشاط", admin_user)
+
+    assert result.status == "unavailable"
+    assert result.error_key == "ai.provider_rejected"
+    assert result.error_detail == "HTTP 400: this is a decisions model"
+    assert result.error_provider == "Rejecting"
+    assert result.answer
+    interaction = ai_service.record(admin_user, "ملخص النشاط", result)
+    db.session.commit()
+    assert interaction.error_detail == "HTTP 400: this is a decisions model"
+
+
+def test_the_last_turns_are_replayed_for_a_follow_up(app, admin_user, monkeypatch):
+    app.config.update(
+        AI_PROVIDER="openai", AI_API_KEY="test-key", AI_BASE_URL="https://provider.test/v1",
+    )
+    seen: list[list[dict]] = []
+
+    def fake_chat(messages):
+        seen.append(list(messages))
+        return '{"answer": "suite"}'
+
+    monkeypatch.setattr(ai_service, "_chat_completion", fake_chat)
+    with app.test_request_context("/ai"):
+        ai_service.ask(
+            "et le mois dernier ?",
+            admin_user,
+            history=[("ventes de ce mois", "12 000 DZD")],
+        )
+
+    roles = [message["role"] for message in seen[0]]
+    assert roles[0] == "system"
+    assert roles[1] == "user" and seen[0][1]["content"] == "ventes de ce mois"
+    assert roles[2] == "assistant" and seen[0][2]["content"] == "12 000 DZD"
+    assert roles[-1] == "user" and seen[0][-1]["content"] == "et le mois dernier ?"
+
+
+def test_a_provider_error_body_cannot_leak_a_key():
+    detail = ai_service._safe_provider_detail(
+        "invalid key sk-abcdefghijklmnop and Authorization: Bearer abcdefghijklmnop"
+    )
+    assert "sk-abcdefghijklmnop" not in detail
+    assert "abcdefghijklmnop" not in detail
+    assert "[redacted]" in detail

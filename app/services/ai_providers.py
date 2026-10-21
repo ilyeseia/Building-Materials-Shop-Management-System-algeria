@@ -18,6 +18,7 @@ not the HTTP client itself, and no credential is written to a log.
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -457,9 +458,14 @@ def _http_json(
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as error:
-        # The body of a provider error can contain the key in rare setups, so
-        # only the status is reported.
-        raise ProviderRequestError(f"http_{error.code}") from error
+        # The body of a provider error explains *why* a model was refused, but
+        # it can echo part of the key in rare setups: scrub it before keeping
+        # only a short message.
+        try:
+            raw = error.read(6000).decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001 - best effort
+            raw = ""
+        raise ProviderRequestError(f"http_{error.code}", _error_message(raw)) from error
     except (urllib.error.URLError, TimeoutError, OSError) as error:
         raise ProviderRequestError(type(error).__name__) from error
     try:
@@ -471,12 +477,40 @@ def _http_json(
     return parsed
 
 
+_SECRET_PATTERN = re.compile(r"(?i)\b(?:sk|pk|rk|api|key)[-_][A-Za-z0-9_\-]{8,}")
+_BEARER_PATTERN = re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}")
+
+
+def _error_message(raw: str, limit: int = 400) -> str:
+    """Extract a short provider message and remove anything key-like."""
+    message = ""
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        parsed = None
+    if isinstance(parsed, dict):
+        payload = parsed.get("error")
+        if isinstance(payload, dict):
+            message = str(payload.get("message") or payload.get("code") or "")
+        elif isinstance(payload, str):
+            message = payload
+        if not message:
+            message = str(parsed.get("message") or parsed.get("detail") or "")
+    if not message:
+        message = raw
+    message = " ".join(str(message or "").split())
+    message = _SECRET_PATTERN.sub("[redacted]", message)
+    message = _BEARER_PATTERN.sub("Bearer [redacted]", message)
+    return message[:limit]
+
+
 class ProviderRequestError(Exception):
     """A provider request failed; the reason is a short, safe code."""
 
-    def __init__(self, reason: str = "unknown") -> None:
+    def __init__(self, reason: str = "unknown", detail: str = "") -> None:
         super().__init__(reason)
         self.reason = reason
+        self.detail = detail
 
 
 def list_remote_models(
@@ -546,7 +580,7 @@ def test_provider(
         return ConnectionResult(
             ok=False,
             message_key="ai.test_failed",
-            detail=error.reason,
+            detail=error.detail or error.reason,
             error_key="ai.test_failed",
         )
     latency = int((time.perf_counter() - started) * 1000)
@@ -555,6 +589,72 @@ def test_provider(
         message_key="ai.test_ok",
         detail=str(len(models)),
         models=models,
+        latency_ms=latency,
+    )
+
+
+def test_model(
+    provider: AIProvider, model_code: str, *, timeout: int | None = None
+) -> ConnectionResult:
+    """Send one minimal chat completion to prove a model can answer.
+
+    Listing ``/models`` is not enough: a gateway also lists models that are
+    incompatible with the chat endpoint (a "decisions" model, an embedding
+    model, ...).  This is the check the administrator runs after adding a model.
+    """
+    import time
+
+    started = time.perf_counter()
+    code = str(model_code or "").strip()
+    if not provider.base_url:
+        return ConnectionResult(ok=False, message_key="ai.test_no_base_url",
+                                error_key="ai.test_no_base_url")
+    if provider.needs_key and not provider.has_key:
+        return ConnectionResult(ok=False, message_key="ai.test_no_key",
+                                error_key="ai.test_no_key")
+    if not code:
+        return ConnectionResult(ok=False, message_key="ai.test_no_model",
+                                error_key="ai.test_no_model")
+    try:
+        key = credential_for(provider)
+    except ai_keys.KeyUnavailable:
+        return ConnectionResult(ok=False, message_key="ai.test_key_unreadable",
+                                error_key="ai.test_key_unreadable")
+    payload = {
+        "model": code,
+        "messages": [{"role": "user", "content": "ping"}],
+        "max_tokens": 1,
+        "temperature": 0,
+    }
+    try:
+        body = _http_json(
+            f"{provider.base_url.rstrip('/')}/chat/completions",
+            key=key,
+            timeout=timeout or int(current_app.config.get("AI_TIMEOUT_SECONDS", 20)),
+            method="POST",
+            payload=payload,
+        )
+    except ProviderRequestError as error:
+        return ConnectionResult(
+            ok=False,
+            message_key="ai.model_test_failed",
+            detail=error.detail or error.reason,
+            error_key="ai.model_test_failed",
+        )
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        detail = _error_message(json.dumps(body, ensure_ascii=False))
+        return ConnectionResult(
+            ok=False,
+            message_key="ai.model_test_failed",
+            detail=detail or "empty_choices",
+            error_key="ai.model_test_failed",
+        )
+    latency = int((time.perf_counter() - started) * 1000)
+    return ConnectionResult(
+        ok=True,
+        message_key="ai.model_test_ok",
+        detail=code,
         latency_ms=latency,
     )
 

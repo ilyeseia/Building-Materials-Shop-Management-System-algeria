@@ -553,3 +553,82 @@ def test_the_delete_button_sends_a_usable_csrf_token(app, auth_client):
 
     db.session.expire_all()
     assert ai_providers.get_provider_by_code("csrf_provider") is None
+
+# ---------------------------------------------------------------------------
+# Testing a model against the chat endpoint
+# ---------------------------------------------------------------------------
+
+def test_testing_a_model_posts_one_minimal_completion(app, monkeypatch):
+    with app.test_request_context("/ai"):
+        provider = ai_providers.create_provider(
+            code="tester", name="Tester", base_url="https://tester.test/v1",
+            api_key="sk-test",
+        )
+        db.session.commit()
+        captured = {}
+
+        def fake_http(url, *, key, timeout, method="GET", payload=None):
+            captured.update({"url": url, "key": key, "method": method, "payload": payload})
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+        monkeypatch.setattr(ai_providers, "_http_json", fake_http)
+        result = ai_providers.test_model(provider, "good-model")
+
+    assert result.ok is True
+    assert result.message_key == "ai.model_test_ok"
+    assert captured["url"] == "https://tester.test/v1/chat/completions"
+    assert captured["method"] == "POST"
+    assert captured["payload"]["model"] == "good-model"
+    assert captured["payload"]["max_tokens"] == 1
+    assert captured["key"] == "sk-test"
+
+
+def test_testing_a_model_reports_the_provider_message(app, monkeypatch):
+    with app.test_request_context("/ai"):
+        provider = ai_providers.create_provider(
+            code="tester2", name="Tester", base_url="https://tester.test/v1",
+            api_key="sk-test",
+        )
+        db.session.commit()
+
+        def fake_http(*_args, **_kwargs):
+            raise ai_providers.ProviderRequestError(
+                "http_400",
+                "HTTP 400: this is a decisions model and cannot be used with chat",
+            )
+
+        monkeypatch.setattr(ai_providers, "_http_json", fake_http)
+        result = ai_providers.test_model(provider, "decisions-only")
+
+    assert result.ok is False
+    assert result.error_key == "ai.model_test_failed"
+    assert "decisions model" in result.detail
+
+
+def test_testing_a_model_through_the_interface_records_an_audit_event(
+    auth_client, app, monkeypatch
+):
+    auth_client.post("/ai/providers/new", data={
+        "catalog_code": "groq", "code": "audit_provider", "name": "Groq",
+        "base_url": "https://api.groq.com/openai/v1", "api_key": "k", "is_active": "y",
+    }, follow_redirects=True)
+    provider = ai_providers.get_provider_by_code("audit_provider")
+    model = ai_providers.create_model(provider, code="audit-model")
+    db.session.commit()
+
+    def fake_test(_provider, _code, **_kwargs):
+        return ai_providers.ConnectionResult(
+            ok=True, message_key="ai.model_test_ok", detail="audit-model", latency_ms=12,
+        )
+
+    monkeypatch.setattr(ai_providers, "test_model", fake_test)
+    response = auth_client.post(f"/ai/models/{model.id}/test", follow_redirects=True)
+    assert response.status_code == 200
+    assert db.session.query(AuditEvent).filter_by(action="tested").count() == 1
+
+
+def test_a_model_test_needs_the_manage_permission(client, make_user, login):
+    manager = make_user("manager-model-test", Role.MANAGER)
+    db.session.commit()
+    login(manager)
+    assert client.post("/ai/models/1/test").status_code == 403

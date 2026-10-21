@@ -127,12 +127,20 @@ class RoleForm(BaseForm):
 
 
 class AIQuestionForm(BaseForm):
-    """One question for the read-only AI workspace."""
+    """One question for the AI workspace.
+
+    The workspace is a conversation, not a single fixed form: the user may pick
+    a registered model for this question, decide whether the assistant may read
+    shop data, and write a long or multi-line question.
+    """
 
     question = TextAreaField(
         "ai.question",
         validators=[DataRequired(), Length(min=3, max=1000)],
+        render_kw={"rows": 5, "data-autogrow": "1", "data-ctrl-enter": "1"},
     )
+    target = StringField("ai.choose_model", validators=[Optional(), Length(max=80)])
+    general_mode = BooleanField("ai.general_mode", default=False)
     submit = SubmitField("ai.ask")
 
 
@@ -165,7 +173,11 @@ class AIModelForm(BaseForm):
     provider_id = SelectField(
         "ai.model_provider", validators=[DataRequired()], coerce=int, choices=[]
     )
-    code = StringField("ai.model_code", validators=[DataRequired(), Length(max=120)])
+    code = StringField(
+        "ai.model_code",
+        validators=[DataRequired(), Length(max=120)],
+        render_kw={"list": "model-code-options", "autocomplete": "off"},
+    )
     label = StringField("ai.model_label", validators=[Optional(), Length(max=120)])
     description = TextAreaField("common.description", validators=[Optional()])
     context_window = IntegerField(

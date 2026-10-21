@@ -38,6 +38,9 @@ class AIInteraction(db.Model):
     tool_calls = db.Column(db.Text)
     latency_ms = db.Column(db.Integer)
     error_key = db.Column(db.String(120))
+    #: Short, secret-free provider message explaining a fallback (for example
+    #: "HTTP 400: this model cannot be used with chat/completions").
+    error_detail = db.Column(db.Text)
 
     user = db.relationship("User", lazy="joined")
 

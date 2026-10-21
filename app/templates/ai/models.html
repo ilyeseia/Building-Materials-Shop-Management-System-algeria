@@ -78,6 +78,10 @@
             </td>
             <td class="small">
               <div class="row-actions">
+                <form method="post" action="{{ url_for('ai.model_test', model_id=model.id) }}" class="inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn small secondary" type="submit">{{ t('ai.test_model') }}</button>
+                </form>
                 <a class="btn small secondary" href="{{ url_for('ai.model_edit', model_id=model.id) }}">{{ t('action.edit') }}</a>
                 <form method="post" action="{{ url_for('ai.model_toggle', model_id=model.id) }}" class="inline">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

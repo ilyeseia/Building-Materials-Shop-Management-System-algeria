@@ -21,6 +21,11 @@
     {{ checkbox(form.is_active) }}
     {{ checkbox(form.is_default) }}
   </div>
+  {% if suggestions %}
+    <datalist id="model-code-options">
+      {% for suggestion in suggestions %}<option value="{{ suggestion }}"></option>{% endfor %}
+    </datalist>
+  {% endif %}
   <p class="small muted">{{ t('ai.model_code_help') }}</p>
   <div class="form-actions">
     {{ form.submit(class_='btn') }}

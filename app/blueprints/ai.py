@@ -65,9 +65,21 @@ def _answer(form: AIQuestionForm):
     if not ai_service.is_enabled():
         abort(404)
     question = form.question.data or ""
+    user = _current_user()
+    target_key = (form.target.data or "").strip() or ai_service.AUTO_TARGET
+    known = {option["key"] for option in ai_service.target_options()}
+    if target_key not in known and target_key not in {ai_service.AUTO_TARGET, ai_service.LOCAL_TARGET}:
+        flash(translate("ai.target_missing"), "warning")
+        target_key = ai_service.AUTO_TARGET
     try:
-        result = ai_service.ask(question, _current_user())
-        interaction = ai_service.record(_current_user(), question, result)
+        result = ai_service.ask(
+            question,
+            user,
+            target_key=target_key,
+            use_data=not bool(form.general_mode.data),
+            history=_conversation(user),
+        )
+        interaction = ai_service.record(user, question, result)
         db.session.commit()
     except BusinessError as error:
         db.session.rollback()
@@ -82,14 +94,42 @@ def _answer(form: AIQuestionForm):
         return redirect(url_for("ai.index"))
 
     if result.status == ai_service.AI_STATUS_UNAVAILABLE:
-        flash(translate("ai.provider_fallback"), "warning")
+        if result.error_key == "ai.general_needs_provider":
+            flash(translate("ai.general_needs_provider"), "warning")
+        else:
+            flash(translate("ai.provider_fallback"), "warning")
+            if result.error_detail and _can_manage():
+                flash(
+                    translate(
+                        "ai.provider_fallback_detail",
+                        provider=result.error_provider or translate("ai.provider_external"),
+                        detail=result.error_detail[:300],
+                    ),
+                    "danger",
+                )
     elif result.status == ai_service.AI_STATUS_REFUSED:
         flash(result.answer, "warning")
     return redirect(url_for("ai.index", interaction=interaction.id))
 
 
+def _conversation(user) -> list[tuple[str, str]]:
+    """The last few exchanges, oldest first, for a follow-up question."""
+    try:
+        rows = ai_service.history_for(user, limit=3)
+    except Exception:  # noqa: BLE001 - history is a convenience, never a blocker
+        return []
+    return [(row.question, row.answer or "") for row in reversed(rows)]
+
+
+def _can_manage() -> bool:
+    from app.security import has_permission
+
+    return has_permission(_current_user(), "ai.manage")
+
+
 def _render(form: AIQuestionForm):
-    history = ai_service.history_for(_current_user(), limit=10)
+    user = _current_user()
+    history = ai_service.history_for(user, limit=10)
     latest = None
     interaction_id = request.args.get("interaction", type=int)
     if interaction_id:
@@ -101,8 +141,10 @@ def _render(form: AIQuestionForm):
         form=form,
         history=history,
         latest=latest,
-        tools=ai_service.available_tools(_current_user()),
+        tools=ai_service.available_tools(user),
         provider=ai_service.provider_info(),
+        targets=ai_service.target_options(),
+        can_manage=_can_manage(),
         enabled=True,
     )
 
@@ -301,6 +343,11 @@ def model_new():
     provider_id = request.args.get("provider", type=int)
     if not form.is_submitted() and provider_id:
         form.provider_id.data = provider_id
+    selected = None
+    if form.is_submitted() and form.provider_id.data:
+        selected = ai_providers.get_provider(form.provider_id.data)
+    elif provider_id:
+        selected = ai_providers.get_provider(provider_id)
     if form.validate_on_submit():
         provider = ai_providers.get_provider(form.provider_id.data)
         if provider is None:
@@ -323,8 +370,10 @@ def model_new():
         db.session.commit()
         flash(translate("ai.model_added"), "success")
         return redirect(url_for("ai.models", provider=provider.id))
-    return render_template("ai/model_form.html", form=form,
-                           title_key="ai.model_new", provider=None)
+    return render_template(
+        "ai/model_form.html", form=form, title_key="ai.model_new",
+        provider=selected, suggestions=_model_suggestions(selected),
+    )
 
 
 @bp.route("/ai/models/<int:model_id>/edit", methods=["GET", "POST"])
@@ -363,7 +412,8 @@ def model_edit(model_id: int):
         flash(translate("common.saved"), "success")
         return redirect(url_for("ai.models", provider=provider.id))
     return render_template("ai/model_form.html", form=form,
-                           title_key="ai.model_edit", provider=model.provider)
+                           title_key="ai.model_edit", provider=model.provider,
+                           suggestions=_model_suggestions(model.provider))
 
 
 @bp.post("/ai/models/<int:model_id>/delete")
@@ -397,6 +447,30 @@ def model_toggle(model_id: int):
     return redirect(url_for("ai.models", provider=provider_id))
 
 
+@bp.post("/ai/models/<int:model_id>/test")
+@requires("ai.manage")
+def model_test(model_id: int):
+    """Prove that one model accepts a chat completion before relying on it."""
+    model = ai_providers.get_model(model_id)
+    if model is None:
+        flash(translate("error.not_found"), "danger")
+        return redirect(url_for("ai.models"))
+    result = ai_providers.test_model(model.provider, model.code)
+    _audit(
+        "tested", "ai_model", model.id,
+        summary=f"{model.code} {'ok' if result.ok else 'failed'} {result.latency_ms}ms",
+    )
+    db.session.commit()
+    if result.ok:
+        flash(translate("ai.model_test_ok", ms=result.latency_ms), "success")
+    else:
+        flash(
+            translate("ai.model_test_failed", detail=(result.detail or "")[:300]),
+            "danger",
+        )
+    return redirect(url_for("ai.models", provider=model.provider_id))
+
+
 # ======================================================================
 # Helpers
 # ======================================================================
@@ -411,6 +485,14 @@ def _fill_provider_choices(form: AIModelForm) -> None:
     form.provider_id.choices = [
         (provider.id, provider.name) for provider in ai_providers.list_providers()
     ]
+
+
+def _model_suggestions(provider) -> list[str]:
+    """Well-known model ids for the provider, as a ``<datalist>`` hint."""
+    if provider is None:
+        return []
+    entry = ai_providers.catalog_entry(provider.code)
+    return list(entry.suggested_models) if entry is not None else []
 
 
 def _environment_status() -> dict:
