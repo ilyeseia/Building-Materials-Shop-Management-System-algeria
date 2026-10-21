@@ -5,10 +5,10 @@ This is the authoritative status of the current release work.  It separates
 `PASS`, `PARTIAL`, `FAIL`, `NOT TESTED` and `BLOCKED`.
 
 **Source version:** `1.1.0` (`VERSION`)  
-**Deployed commit:** `82334a9` (pushed to the `algeria` remote)  
+**Deployed commit:** `54e54f5` (pushed to the `algeria` remote)  
 **Database revision:** `c3d4e5f6a7b8` (head), 55 tables / 183 foreign keys  
-**Local suite:** **257 passed, 0 failed, 0 skipped** in 130.14 s (229 original +
-28 new IAM frontend tests)  
+**Local suite:** **266 passed, 0 failed, 0 skipped** in 171.27 s (229 original +
+28 IAM frontend tests + 9 logout tests)  
 **Production before this deployment:** image from `cc5ed50`, database
 `b2c3d4e5f6a7`, 52 tables, 180 foreign keys, existing rows preserved.  
 **Migrations applied:** `b2c3d4e5f6a7` (append-only AI interactions + per-business
@@ -34,7 +34,8 @@ verified pre-update backup.
 | Reproducible release | **PASS (script)** | `scripts/release.sh` archives `HEAD`, checks dirty/untracked trees, writes SHA-256 + manifest | Release archive not yet produced/tagged |
 | Performance | **PARTIAL** | N+1 removed: dashboard 1,014→16 queries (SQLite 993→101 ms p50; MySQL 130.6 ms p50); receivables 1,003→4 (MySQL 147.3 ms); sales list 139→4; query-count regression tests | Not concurrent and not a write-path load test |
 | Production deployment of this release | **PASS** | Deployed 2026-10-21 to commit `82334a9`: pre-update backup `bmshop-20261021-071417` verified in isolation (52/52 tables, revision `b2c3d4e5f6a7`, 180 FKs, CHECK TABLE pass); migration `c3d4e5f6a7b8` applied non-destructively (55 tables, 183 FKs); image rebuilt and container recreated with labels `1.1.0 / 82334a9`; both containers healthy; `/healthz` 200, login 200, 16 authenticated pages 200; `flask doctor` 11 PASS / 1 WARN; products=2 and users=2 preserved; post-deploy backup `bmshop-20261021-072223` verified (55/55, revision `c3d4e5f6a7b8`) | Rollback path is the downgrade tested on a disposable MySQL scratch DB, not yet exercised against live production |
-| Enterprise IAM subsystem | **PASS** | Migration `c3d4e5f6a7b8` applied; role/session/profile/security/audit pages 200 on the deployed app; functional test creates a custom role, creates a user with it, verifies the permission set, verifies the AI tool list is filtered, creates and revokes a session, and confirms the revocation is audited; 257 local tests pass | Playwright browser rendering of the new pages is NOT TESTED; the admin password was reset during deployment (see section 5) |
+| Enterprise IAM subsystem | **PASS** | Migration `c3d4e5f6a7b8` applied; role/session/profile/security/audit pages 200 on the deployed app; functional test creates a custom role, creates a user with it, verifies the permission set, verifies the AI tool list is filtered, creates and revokes a session, and confirms the revocation is audited; 266 local tests pass | Playwright browser rendering of the new pages is NOT TESTED; the admin password was reset during deployment (see section 5) |
+| Sign-out ends the session | **PASS (fixed)** | Four defects found and fixed (see section 6).  Verified in a real browser against the deployed app with "remember me" ticked: the `remember_token` cookie is deleted, the dashboard redirects to the login page, and signing in again works.  Verified over real HTTP with a cookie jar as well. | `GET /logout` is still accepted for backward compatibility and is therefore a low-severity forced-logout vector; the application's own UI uses `POST` with a CSRF token |
 | Public TLS access | **BLOCKED** | Application side is healthy: the host port `127.0.0.1:8090` answers `/login` and `/healthz` with 200 on every attempt, and the `tsdproxy` container is up and healthy.  The public Funnel path is intermittent: 12 rapid requests to the public `/login` on 2026-10-21 returned 5 × 200 and 7 × connection failures, while the same URL succeeded on 4 of 5 earlier attempts.  This is the pre-existing, still-unresolved TLS/ALPN problem and is **not** caused by the 2026-10-21 deployment. | Needs a TLS/ALPN/client comparison between Tailscale Funnel, tsdproxy and the client before any proxy change |
 | Off-site backup / PITR | **BLOCKED** | Scripts exist and are guarded | No destination, credentials, binlog retention or restore drill |
 
@@ -234,3 +235,59 @@ changed.**
 | Concurrent-load capacity | **NOT TESTED** — the benchmark is single-process |
 | Off-site backup / PITR | **BLOCKED** — no destination or credentials |
 | Public TLS path from branded Chrome | **BLOCKED** — root cause still unknown; server-side `curl` over HTTPS now succeeds |
+
+---
+
+## 6. Sign-out fix (deployed 2026-10-21, commits `ce49c2d` and `54e54f5`)
+
+The operator reported that signing out did not sign out: the account stayed
+signed in and the tracked session kept running.  Four separate defects were
+behind it.  All four are fixed and verified on the deployed application.
+
+### 6.1 The defects
+
+| # | Defect | Effect |
+|---|---|---|
+| 1 | Flask-Login marks the persistent "remember me" cookie for deletion with `session["_remember"] = "clear"`.  The logout view called `session.clear()` straight afterwards, which **wiped that marker**, so the cookie was never deleted.  On the next request Flask-Login found the cookie, `session.get("_remember")` was no longer `"clear"`, and it **silently signed the user back in**. | Clicking sign-out left the browser authenticated.  This is the reported symptom. |
+| 2 | `SessionManager.revoke_session()` raises `BusinessError("session_not_found")` when the tracked row is missing.  The logout view called it unguarded, so the exception aborted the route with a **500 error** before `logout_user()` and `session.clear()` were reached. | The sign-out failed with an error page and the user stayed signed in. |
+| 3 | `change_password()` used `session.sid` to keep the current session alive.  Flask's `SecureCookieSession` has no `sid` attribute, so this raised `AttributeError` on **every** password change. | Changing a password always ended in a 500 error. |
+| 4 | Revoking a session from the sessions page only greyed out a row in a table.  **Nothing checked the tracked session on a request**, so a revoked session kept working. | The session management screen had no effect. |
+
+Defect 1 also existed in the "deactivated account must lose access immediately"
+path in `app/__init__.py`, where a disabled account was signed out but its
+remember cookie survived - the account was immediately signed back in.
+
+### 6.2 The fixes
+
+* `logout()` re-applies `session["_remember"] = "clear"` after clearing the
+  session, so Flask-Login's `after_request` hook really deletes the cookie.
+  The same correction is applied to the deactivated-account path.
+* `SessionManager.revoke_session_if_present()` never raises; a missing row
+  already means the desired end state.
+* `change_password()` uses the tracked session key, which also keeps the
+  session that made the change alive.
+* A `before_request` hook checks the tracked session on every request and
+  signs the user out when the session has been revoked.
+* `SessionManager.create_session()` is now an upsert, so a re-used session key
+  can no longer violate the unique index and break a second sign-in.
+* `SessionManager.check_and_touch()` performs the check and the "last seen"
+  stamp in **one** query, and only writes the stamp once it is a minute old.
+
+### 6.3 Verification
+
+| Check | Result |
+|---|---|
+| New automated tests | 10 in `tests/test_logout.py`; **266 local tests pass** |
+| Query cost | A dashboard request stays at 17-20 queries; a regression guard asserts it stays under 30 |
+| Real HTTP against the deployed server (cookie jar) | `remember_token` set on sign-in with "remember me" ticked, **removed** after sign-out, dashboard then redirects to `/login`, tracked session row `is_active = 0` |
+| Real browser against the deployed app (Playwright, 1440×900) | Signed in with "remember me" ticked, sign-out button pressed, redirected to `/login`, `remember_token` cookie **deleted**, dashboard not reachable, signing in again works, **0 console/page errors** |
+| Deployment | Pre-deploy backup `bmshop-20261021-075443`, post-deploy backup `bmshop-20261021-080148` (55/55 tables, revision `c3d4e5f6a7b8`, CHECK TABLE pass) |
+| Release identity | `flask version` reports `1.1.0 / 54e54f5`; `flask doctor` 11 PASS / 1 WARN |
+
+### 6.4 Known remaining item
+
+`GET /logout` is still accepted for backward compatibility, so a third-party
+page could force a sign-out (a nuisance, not a data leak).  The application's
+own UI uses `POST` with a CSRF token, and `POST` is protected.  Restricting the
+route to `POST` alone was not done because it would change an existing,
+documented behaviour.
