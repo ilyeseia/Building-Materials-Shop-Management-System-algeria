@@ -16,7 +16,8 @@ preserved.
 **Production after this deployment:** image from `a971706`, same database
 revision, 57 tables / 184 foreign keys, products=2, users=2, 31 append-only AI
 interaction rows at the 2026-10-22 09:51 UTC check (29 at deployment; rows 30
-and 31 are later real user interactions), both containers healthy, `flask
+and 31 are later interactions created at 07:25 and 07:47 UTC with status `ok`),
+both containers healthy, `flask
 doctor` 11 PASS / 1 WARN.
 The public HTTPS path was re-established on 2026-10-22 through a dedicated
 Tailscale Funnel sidecar after the tsdproxy publication lost its Funnel ingress
