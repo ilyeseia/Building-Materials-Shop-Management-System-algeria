@@ -14,11 +14,15 @@ Flask-Login deprecation warnings)
 `e5f6a7b8c9d0`, 57 tables, 184 foreign keys, products=2, users=2, existing rows
 preserved.  
 **Production after this deployment:** image from `a971706`, same database
-revision, 57 tables / 184 foreign keys, products=2, users=2, 29 append-only AI
-interaction rows, both containers healthy, `flask doctor` 11 PASS / 1 WARN.
-The public HTTPS path passed a browser login + in-place-answer check after the
-deploy, and a login + `/ai` page check after the funnel reinstall; the earlier
-intermittency is recorded as a historical limitation (section 9).
+revision, 57 tables / 184 foreign keys, products=2, users=2, 31 append-only AI
+interaction rows at the 2026-10-22 09:51 UTC check (29 at deployment; rows 30
+and 31 are later real user interactions), both containers healthy, `flask
+doctor` 11 PASS / 1 WARN.
+The public HTTPS path was re-established on 2026-10-22 through a dedicated
+Tailscale Funnel sidecar after the tsdproxy publication lost its Funnel ingress
+target; the public hostname is unchanged.  See section 10 for the root cause,
+evidence and remaining limits.  The earlier intermittency remains recorded in
+section 9.
 
 **Migrations applied (historical):** `b2c3d4e5f6a7` (append-only AI interactions
 + per-business `enable_ai`), `c3d4e5f6a7b8` (Enterprise IAM),
@@ -48,7 +52,7 @@ in-place-answer change `a971706` adds **no migration**.
 | Enterprise IAM subsystem | **PASS** | Migration `c3d4e5f6a7b8` applied; role/session/profile/security/audit pages 200 on the deployed app; functional test creates a custom role, creates a user with it, verifies the permission set, verifies the AI tool list is filtered, creates and revokes a session, and confirms the revocation is audited; the current full suite has 322 passing tests | Playwright browser rendering of the new IAM pages is **NOT TESTED**; the admin password reset note in section 5 is historical |
 | Sign-out ends the session | **PASS (fixed)** | Four defects found and fixed (see section 6).  Verified in a real browser against the deployed app with "remember me" ticked: the `remember_token` cookie is deleted, the dashboard redirects to the login page, and signing in again works.  Verified over real HTTP with a cookie jar as well. | `GET /logout` is still accepted for backward compatibility and is therefore a low-severity forced-logout vector; the application's own UI uses `POST` with a CSRF token |
 | AI provider administration | **PASS** | Migrations `d4e5f6a7b8c9` and `e5f6a7b8c9d0` applied; provider id=3 OpenRouter is configured, the key is stored encrypted and never rendered; the live provider test listed **468 models** (audit event 177) and the MiniMax chat test returned in **993 ms** (audit event 178); real answers arrived through both the server-rendered form and the in-place fetch path (interactions 24, 27 and 29) | Nemotron can fail upstream with a capacity 502 (recorded fallback); free-tier latency/availability has no SLA; the public Funnel path was re-registered on 2026-10-22 (section 9) |
-| Public TLS access | **PASS (current verification)** | Application side is healthy: the host port `127.0.0.1:8090` answers `/login` and `/healthz` with 200, and the `tsdproxy` container is up and healthy.  Earlier on 2026-10-21 the public path was intermittent: 12 rapid requests to `/login` returned 5 × 200 and 7 × connection failures.  After the `a971706` deploy, 12/12 `/healthz` and a public Chromium login + in-place local answer passed.  After the 2026-10-22 funnel reinstall (section 9), `tsdproxy.funnel: "true"` was verified on the recreated container, tsdproxy re-registered the proxy, **6/6** `/healthz` and **3/3** `/login` returned 200, and a public Chromium login + `/ai` page passed in a secure context with **0 console errors and 0 failed responses**. | The earlier 5/12 failure was not root-caused and no long soak was run; this is a current PASS, not a proof that the old TLS/ALPN fault cannot recur.  The SSH tunnel remains the deterministic acceptance path. |
+| Public TLS access | **PASS (IPv4, current; 2026-10-22 09:51 UTC)** | Public hostname is served by the dedicated `bmshop-tailscale` sidecar, not tsdproxy.  All three public ingress IPs returned `/healthz` 200 (`176.58.90.46`, `.63`, `.145`), natural public DNS returned 200, `/` returned 302 -> `/login` 200 with CSP/HSTS, Arabic RTL, local static assets and the exact Let's Encrypt certificate (valid to 2027-01-17).  External check-host nodes returned `/healthz` 200 (IL/SE at 09:20 UTC) and `/` 302 (CH/IN/SI at ~09:45 UTC); Windows external network also returned 200 on all three IPs.  App health `{"database":true,"status":"ok"}`; DB 57 tables / 184 FKs, products=2, users=2, AI=31, revision `e5f6a7b8c9d0`.  Root cause and full evidence: section 10. | Restart resilience is **PARTIAL**: a cold restart can lose the Funnel edge target until the `reset`/`set` recovery runs; a watchdog is installed but a full host reboot is **NOT TESTED**.  Public IPv6, a long soak and concurrent load are **NOT TESTED**; Tailscale admin/control-plane access is **BLOCKED**. |
 | Off-site backup / PITR | **BLOCKED** | Scripts exist and are guarded | No destination, credentials, binlog retention or restore drill |
 
 ---
@@ -523,7 +527,7 @@ interaction table is append-only, so these verification rows are retained.
 |---|---|
 | Concurrent-load capacity with a real provider | **NOT TESTED** |
 | Nemotron free-model reliability | **PARTIAL** — upstream 502/capacity is possible; fallback records the error; MiniMax is the working default |
-| Public Funnel/TLS path | **PASS (current verification)** — `tsdproxy.funnel: "true"` verified on the recreated container, proxy re-registered, 6/6 `/healthz` + 3/3 `/login` 200, and a public Chromium login + `/ai` page passed in a secure context with 0 console/failed responses (section 9) |
+| Public Funnel/TLS path | **PASS (IPv4, current; see section 10)** - dedicated `bmshop-tailscale` sidecar with an explicit `tailscale funnel` handler; all 3 ingress IPs 200 `/healthz`, external check-host 302 `/`, natural DNS 200.  Restart recovery is PARTIAL, IPv6/long soak are NOT TESTED, and Tailscale admin/control-plane access is BLOCKED. |
 | Public TLS long soak / branded Chrome | **NOT TESTED** — the earlier 5/12 failure was not root-caused; no 24-hour or multi-client soak was run and branded Chrome was not separately re-exercised |
 | Off-site backup / PITR | **BLOCKED** — no destination, credentials, binlog retention or restore drill |
 | Restore of the `a971706` backups in isolation | **NOT TESTED** — the backups were checksum/gzip-verified, but this code-only deploy did not repeat a full restore drill; the earlier restore drill remains the evidence for the mechanism |
@@ -549,3 +553,86 @@ re-register the service.
 | Data | 57 tables / 184 FKs; products=2, users=2; **29** AI interactions; the real user question id 29 (`"سلام"`, OpenRouter MiniMax, 1560 ms) was preserved |
 | Backups | Pre `pre-funnel-reinstall-20261022` (JSON 307 rows / 29 AI; SQL `bmshop-20261022-071633`) and post `post-funnel-reinstall-20261022` (JSON 309 rows / 29 AI; SQL `bmshop-20261022-072012`); SHA-256, gzip and dump-complete marker verified |
 | Status | **PASS (current verification)**.  The earlier 5/12 TLS failure was not root-caused, no long soak was run, and branded Chrome was not separately re-exercised; this PASS covers the current public path, not a proof that the old TLS/ALPN fault cannot recur |
+
+
+> **Superseded (2026-10-22 09:19 UTC):** the tsdproxy path described above
+> later lost its Funnel ingress target while the local tailnet URL still
+> worked.  The app is now published by the dedicated sidecar in section 10;
+> the tsdproxy labels are disabled (`tsdproxy.enable: "false"`).  Do not
+> re-enable both at once.
+
+---
+
+## 10. Public HTTPS recovery with a dedicated Funnel sidecar (2026-10-22)
+
+### Symptom
+
+The public URL failed with `ERR_CONNECTION_CLOSED` / curl `000` from multiple
+external networks while the local tailnet URL and the app's `127.0.0.1:8090`
+port stayed healthy.  The failure was not client-specific: check-host nodes in
+Ireland/Japan/Slovenia got a broken pipe, the Windows egress IP
+`154.242.79.225` failed, and the server egress `197.112.103.118` failed.
+
+### Root cause
+
+tsdproxy v1.4.7 calls Tailscale's `ListenFunnel`, which sets the persisted
+`AllowFunnel` bit, but it can leave the proxy with **no serve handler**.
+`tailscale funnel status` showed `funnel=on` with no serve config.  The
+tsdproxy default ephemeral device also changed the tailnet IP on restarts, so
+the Funnel control-plane/edge target was missing or partially stale.
+Lowercasing the hostname and setting `tsdproxy.ephemeral=false` stabilized the
+device identity (`100.114.124.32`, profile `192e`) but did not restore the
+public target.
+
+### Fix
+
+- Disabled tsdproxy publication for this app (`tsdproxy.enable: "false"`);
+  the app remains on `127.0.0.1:8090` and is otherwise unchanged.
+- Ran a dedicated `tailscale/tailscale:v1.80.3` container
+  (`bmshop-tailscale`) with the same persistent device state and certificate,
+  host networking and userspace Tailscale.
+- Registered an explicit handler:
+
+  ```bash
+  docker exec bmshop-tailscale tailscale funnel reset
+  docker exec bmshop-tailscale tailscale funnel --bg http://127.0.0.1:8090
+  ```
+
+- Installed `deploy/funnel/ensure-funnel.sh` (cron, every minute) to repeat the
+  reset/set after a container restart.  Reproducible files and restore steps
+  are in `deploy/funnel/`.
+- The public hostname is unchanged.  No application code, schema, permission
+  or data was changed.
+
+### Verification (2026-10-22)
+
+| Check | Result |
+|---|---|
+| All three public ingress IPs | `176.58.90.46`, `.63`, `.145` all returned `/healthz` **200** (final check 09:51 UTC) |
+| Natural public DNS | `https://.../healthz` **200** via `176.58.90.46`, TLS verify 0 |
+| Root / login | `/` **302** -> `/login?next=%2F`; `/login` **200**, 14,521 bytes |
+| Headers | CSP `default-src 'self'`; HSTS `max-age=31536000`; `X-Frame-Options: DENY`; `X-Content-Type-Options: nosniff`; secure HttpOnly session cookie |
+| Arabic-first UI | `dir="rtl"`, `lang="ar"`, FR/EN links and local `/static/` assets observed; CSS/JS 200 |
+| TLS certificate | Let's Encrypt, exact SAN `building-materials-shop-management-system.tail7d68dd.ts.net`, valid to 2027-01-17; no CDN |
+| External check-host | `/healthz` **200** (IL, SE at 09:20 UTC); `/` **302** via `.63`, `.46`, `.145` (CH, IN, SI at ~09:45 UTC) |
+| Windows external network | `/healthz` **200** on all three IPs; `/` **302** with CSP/HSTS |
+| Funnel status | explicit `https://building...` -> `proxy http://127.0.0.1:8090` |
+| Application | `{"database":true,"status":"ok"}`; image `1.1.0 / a971706 / 2026-10-21T12:48:14Z` |
+| Data | 57 tables / 184 FKs; products=2, users=2, AI interactions=31; revision `e5f6a7b8c9d0` |
+| Backup | `bmshop-tailscale-state-20261022T092439Z-cold.tgz` (9.1K); app compose `app-compose-20261022T092056Z-dedicated.yml`; earlier DB/tsdproxy backups retained |
+| SSH exposure | Windows SSH Funnel reset; `tailscale funnel status` reports `No serve config` |
+
+### Status and remaining limits
+
+- Public HTTPS over IPv4: **PASS (current)**.
+- Restart resilience: **PARTIAL**.  A cold restart lost the edge target until
+  the reset/set sequence ran; the sequence was exercised manually after the
+  09:38 UTC restart and all three IPs recovered within about two minutes.
+  The cron watchdog detection was dry-run tested, but a full host reboot and a
+  cron-triggered restart were **NOT TESTED**.
+- Public IPv6: **NOT TESTED** (no independent IPv6 route/probe).
+- Long soak and concurrent load: **NOT TESTED**.
+- Tailscale admin/control-plane: **BLOCKED** (no admin console/API/CLI on the
+  server); the underlying edge target propagation cannot be inspected there.
+- The old tsdproxy path remains disabled; do not enable it while the dedicated
+  sidecar is running.

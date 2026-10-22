@@ -69,25 +69,18 @@ services:
       # Dumps written by scripts/backup.sh.
       - app-backups:/app/backups
     # -------------------------------------------------------------------------
-    # Optional: publish this service on the tailnet through tsdproxy.
-    # tsdproxy reads these labels from the container; nothing else is needed.
-    #
-    #   tsdproxy.container_port  the port INSIDE this container.  Gunicorn
-    #                            listens on 8000 here; HOST_PORT (8090) exists
-    #                            only on the host and is invisible to tsdproxy.
-    #   tsdproxy.funnel          "true" makes the service reachable from the
-    #                            public internet (Tailscale Funnel), protected
-    #                            only by this application's own sign-in and
-    #                            rate limiting.  Use "false" to keep it private
-    #                            to the tailnet, or delete the four labels to
-    #                            leave the service unpublished.  Funnel requires
-    #                            HTTPS on 443/8443/10000, which tsdproxy handles.
+    # Public HTTPS is served by the dedicated Tailscale Funnel sidecar in
+    # deploy/funnel/.  Do not enable tsdproxy for this service: tsdproxy
+    # v1.4.7 sets Funnel's AllowFunnel flag but does not install a serve
+    # handler, so the public hostname can have no Funnel ingress target.
+    # The labels below are kept disabled for reference/rollback.
     # -------------------------------------------------------------------------
     labels:
-      tsdproxy.enable: "true"
-      tsdproxy.name: "Building-Materials-Shop-Management-System"
+      tsdproxy.enable: "false"
+      tsdproxy.name: "building-materials-shop-management-system"
       tsdproxy.container_port: "8000"
       tsdproxy.funnel: "true"
+      tsdproxy.ephemeral: "false"
     ports:
       # BIND_ADDRESS=127.0.0.1 keeps the service private to this machine.
       - "${BIND_ADDRESS:-127.0.0.1}:${HOST_PORT:-8080}:8000"

@@ -1,0 +1,24 @@
+services:
+  funnel:
+    image: tailscale/tailscale:v1.80.3
+    container_name: bmshop-tailscale
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    environment:
+      # Userspace networking avoids creating a tailscale0 interface or
+      # changing host routes.  Funnel still works through the userspace stack.
+      TS_USERSPACE: "true"
+      TS_STATE_DIR: /var/lib/tailscale
+      # Match the prefs already stored in the persistent state volume.
+      TS_EXTRA_ARGS: "--accept-dns=false --accept-routes --hostname=building-materials-shop-management-system"
+    volumes:
+      # This volume is the device identity and the TLS certificate cache.
+      # Do not delete or recreate it without a verified backup.
+      - funnel-state:/var/lib/tailscale
+
+volumes:
+  funnel-state:
+    external: true
+    name: bmshop-tailscale-state
