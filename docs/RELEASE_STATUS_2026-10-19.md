@@ -1,4 +1,4 @@
-# Release status - 2026-10-19 (updated 2026-10-21)
+# Release status - 2026-10-19 (updated 2026-10-22)
 
 This is the authoritative status of the current release work.  It separates
 **verified** facts from **not tested** and **blocked** items.  Statuses are
@@ -14,8 +14,12 @@ Flask-Login deprecation warnings)
 `e5f6a7b8c9d0`, 57 tables, 184 foreign keys, products=2, users=2, existing rows
 preserved.  
 **Production after this deployment:** image from `a971706`, same database
-revision, 57 tables / 184 foreign keys, products=2, users=2, 27 append-only AI
-interaction rows, both containers healthy, `flask doctor` 11 PASS / 1 WARN.  
+revision, 57 tables / 184 foreign keys, products=2, users=2, 29 append-only AI
+interaction rows, both containers healthy, `flask doctor` 11 PASS / 1 WARN.
+The public HTTPS path passed a browser login + in-place-answer check after the
+deploy, and a login + `/ai` page check after the funnel reinstall; the earlier
+intermittency is recorded as a historical limitation (section 9).
+
 **Migrations applied (historical):** `b2c3d4e5f6a7` (append-only AI interactions
 + per-business `enable_ai`), `c3d4e5f6a7b8` (Enterprise IAM),
 `d4e5f6a7b8c9` (AI provider registry) and `e5f6a7b8c9d0` (provider error
@@ -28,23 +32,23 @@ in-place-answer change `a971706` adds **no migration**.
 
 | Area | Status | Verified evidence | Remaining limit |
 |---|---|---|---|
-| Authentication, RBAC, CSRF, headers | **PASS** | Security tests; production login/session cookie/CSP/HSTS/frame/referrer headers observed | Public HTTPS path has a separate TLS client failure (see below) |
+| Authentication, RBAC, CSRF, headers | **PASS** | Security tests; production login/session cookie/CSP/HSTS/frame/referrer headers observed | The public path passes the current checks; the earlier TLS intermittency is historical (section 9) |
 | Stock ledger and explicit units | **PASS** | Unit/UoM tests; over-release now refuses instead of clamping; MySQL invariant checks | — |
 | Sales, purchasing, payments, AR/AP | **PASS** | Full chain tests; two-process MySQL payment race drill (one allocation, one refusal); aging tests | No external payment gateway |
 | Backup and restore | **PASS** | Verified production backup restored in isolation: 51/51 tables, 179 FKs, `CHECK TABLE` pass, zero stock/payment violations; destructive drill on disposable DB with safety backup and report | Off-site copy not configured; no PITR |
 | Backup scheduling and alerts | **PARTIAL** | Host cron wrapper, `backup.env` support, rclone/webhook scripts, failure marker on status page | Schedule not installed on the host yet; no destination or webhook credentials |
-| AI workspace (local + registered providers) | **PASS** | Per-question target selector, multi-turn history, opt-in general mode, collapsible tool trace; real OpenRouter MiniMax answers in production through the in-place fetch path (interactions 24 and 27, 7.9 s / 7.0 s, status `ok`); the provider test lists 468 models and the MiniMax chat test returns in 993 ms; local fallback and provider failure recording verified; the async path is browser-tested and the no-JavaScript redirect path is covered by the route tests (section 8) | Nemotron can hit an upstream 502/capacity limit; concurrent load is **NOT TESTED**; public TLS path remains **BLOCKED** |
-| Arabic-first UI and responsiveness | **PASS** | Production Playwright at 1440×900, 834×1112 and 390×844 through an SSH tunnel: `/ai` renders the in-place answer/history and has zero horizontal overflow at all three widths; the async flow was also exercised at 1440 and 390 with screenshots; dark/light theme persists and AR/FR/EN parity is enforced by the translation tests.  Current cache-busting assets are `app.css?v=7` and `app.js?v=5`.  The earlier sidebar-brand fix (`cc5ed50`) remains in place. | Branded-Chrome public TLS path still **BLOCKED** separately (see below) |
+| AI workspace (local + registered providers) | **PASS** | Per-question target selector, multi-turn history, opt-in general mode, collapsible tool trace; real OpenRouter MiniMax answers in production through the in-place fetch path (interactions 24 and 27, 7.9 s / 7.0 s, status `ok`) and a later real user question (interaction 29, "سلام", 1560 ms); the provider test lists 468 models and the MiniMax chat test returns in 993 ms; local fallback and provider failure recording verified; the async path is browser-tested over both the SSH tunnel and the public HTTPS URL, and the no-JavaScript redirect path is covered by the route tests (section 8) | Nemotron can hit an upstream 502/capacity limit; concurrent load is **NOT TESTED**; public TLS has a historical intermittency (section 9) |
+| Arabic-first UI and responsiveness | **PASS** | Production Playwright at 1440×900, 834×1112 and 390×844 through an SSH tunnel: `/ai` renders the in-place answer/history and has zero horizontal overflow at all three widths; the async flow was also exercised over the public HTTPS URL at 1440 and 390 with screenshots; dark/light theme persists and AR/FR/EN parity is enforced by the translation tests.  Current cache-busting assets are `app.css?v=7` and `app.js?v=5`.  The earlier sidebar-brand fix (`cc5ed50`) remains in place. | The public path passes the current checks; the earlier TLS intermittency is a historical limitation (section 9) |
 | Market reference prices | **PASS** | Separate append-only table; unit-aware comparison; stale flag; selling price unchanged in MySQL scratch test | — |
 | System status / doctor / version | **PASS** | Tests; CLI commands; `/settings/system` permission and redaction tests; deployed `flask version` reports `1.1.0 / a971706 / 2026-10-21T12:48:14Z`, `flask db current` reports `e5f6a7b8c9d0`, and `flask doctor` reports 11 PASS / 1 WARN (pre-existing Arabic-PDF-font warning) | — |
 | Licensing | **PASS (transparent, non-enforcing)** | Missing/valid/expired/invalid/tampered license tests; no enforcement path; `flask license-status` | It is metadata, not copy protection; legal terms are contractual |
 | Reproducible release | **PASS (script)** | `scripts/release.sh` archives `HEAD`, checks dirty/untracked trees, writes SHA-256 + manifest | Release archive not yet produced/tagged |
 | Performance | **PARTIAL** | N+1 removed: dashboard 1,014→16 queries (SQLite 993→101 ms p50; MySQL 130.6 ms p50); receivables 1,003→4 (MySQL 147.3 ms); sales list 139→4; query-count regression tests | Not concurrent and not a write-path load test |
-| Production deployment of this release | **PASS** | Deployed 2026-10-21 to commit `a971706` (no migration): pre-deploy backup `pre-async-20261021` (JSON 268 rows; SQL `bmshop-20261021-124255`; checksum and gzip verified) and post-deploy backup `post-async-20261021` (JSON 290 rows / 27 AI interactions; SQL `bmshop-20261021-125307`, dump-complete marker; checksum and gzip verified); image rebuilt with labels `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; app recreated non-destructively; both containers healthy; `/healthz` 200; login and browser acceptance passed; database unchanged at 57 tables / 184 FKs, products=2, users=2, revision `e5f6a7b8c9d0` | The live rollback path was not exercised in this deployment (no migration, so rollback is image-only); public TLS path remains **BLOCKED** |
+| Production deployment of this release | **PASS** | Deployed 2026-10-21 to commit `a971706` (no migration): pre-deploy backup `pre-async-20261021` (JSON 268 rows / 20 AI interactions; SQL `bmshop-20261021-124255`), post-deploy backup `post-async-20261021` (JSON 290 rows / 27 AI; SQL `bmshop-20261021-125307`) and final post-acceptance backup `final-async-20261021` (JSON 294 rows / 28 AI; SQL `bmshop-20261021-130236`), all checksum- and gzip-verified with the dump-complete marker; after the funnel label verification and force-recreate (section 9), pre-reinstall `pre-funnel-reinstall-20261022` (JSON 307 rows / 29 AI; SQL `bmshop-20261022-071633`) and post-reinstall `post-funnel-reinstall-20261022` (JSON 309 rows / 29 AI; SQL `bmshop-20261022-072012`) were also verified; image labels `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; app recreated non-destructively; both containers healthy; `/healthz` 200; login and browser acceptance passed over both the SSH tunnel and the public HTTPS URL; database unchanged at 57 tables / 184 FKs, products=2, users=2, 29 AI interactions, revision `e5f6a7b8c9d0` | The live rollback path was not exercised in this deployment (no migration, so rollback is image-only); the earlier public TLS intermittency is a historical limitation (section 9) |
 | Enterprise IAM subsystem | **PASS** | Migration `c3d4e5f6a7b8` applied; role/session/profile/security/audit pages 200 on the deployed app; functional test creates a custom role, creates a user with it, verifies the permission set, verifies the AI tool list is filtered, creates and revokes a session, and confirms the revocation is audited; the current full suite has 322 passing tests | Playwright browser rendering of the new IAM pages is **NOT TESTED**; the admin password reset note in section 5 is historical |
 | Sign-out ends the session | **PASS (fixed)** | Four defects found and fixed (see section 6).  Verified in a real browser against the deployed app with "remember me" ticked: the `remember_token` cookie is deleted, the dashboard redirects to the login page, and signing in again works.  Verified over real HTTP with a cookie jar as well. | `GET /logout` is still accepted for backward compatibility and is therefore a low-severity forced-logout vector; the application's own UI uses `POST` with a CSRF token |
-| AI provider administration | **PASS** | Migrations `d4e5f6a7b8c9` and `e5f6a7b8c9d0` applied; provider id=3 OpenRouter is configured, the key is stored encrypted and never rendered; the live provider test listed **468 models** (audit event 177) and the MiniMax chat test returned in **993 ms** (audit event 178); real answers arrived through both the server-rendered form and the in-place fetch path (interactions 24 and 27) | Nemotron can fail upstream with a capacity 502 (recorded fallback); free-tier latency/availability has no SLA; the public Funnel path needs the section 7.6 note |
-| Public TLS access | **BLOCKED** | Application side is healthy: the host port `127.0.0.1:8090` answers `/login` and `/healthz` with 200 on every attempt, and the `tsdproxy` container is up and healthy.  The public Funnel path is intermittent: 12 rapid requests to the public `/login` on 2026-10-21 returned 5 × 200 and 7 × connection failures, while the same URL succeeded on 4 of 5 earlier attempts.  This is the pre-existing, still-unresolved TLS/ALPN problem and is **not** caused by the 2026-10-21 deployment. | Needs a TLS/ALPN/client comparison between Tailscale Funnel, tsdproxy and the client before any proxy change |
+| AI provider administration | **PASS** | Migrations `d4e5f6a7b8c9` and `e5f6a7b8c9d0` applied; provider id=3 OpenRouter is configured, the key is stored encrypted and never rendered; the live provider test listed **468 models** (audit event 177) and the MiniMax chat test returned in **993 ms** (audit event 178); real answers arrived through both the server-rendered form and the in-place fetch path (interactions 24, 27 and 29) | Nemotron can fail upstream with a capacity 502 (recorded fallback); free-tier latency/availability has no SLA; the public Funnel path was re-registered on 2026-10-22 (section 9) |
+| Public TLS access | **PASS (current verification)** | Application side is healthy: the host port `127.0.0.1:8090` answers `/login` and `/healthz` with 200, and the `tsdproxy` container is up and healthy.  Earlier on 2026-10-21 the public path was intermittent: 12 rapid requests to `/login` returned 5 × 200 and 7 × connection failures.  After the `a971706` deploy, 12/12 `/healthz` and a public Chromium login + in-place local answer passed.  After the 2026-10-22 funnel reinstall (section 9), `tsdproxy.funnel: "true"` was verified on the recreated container, tsdproxy re-registered the proxy, **6/6** `/healthz` and **3/3** `/login` returned 200, and a public Chromium login + `/ai` page passed in a secure context with **0 console errors and 0 failed responses**. | The earlier 5/12 failure was not root-caused and no long soak was run; this is a current PASS, not a proof that the old TLS/ALPN fault cannot recur.  The SSH tunnel remains the deterministic acceptance path. |
 | Off-site backup / PITR | **BLOCKED** | Scripts exist and are guarded | No destination, credentials, binlog retention or restore drill |
 
 ---
@@ -113,24 +117,32 @@ in-place-answer change `a971706` adds **no migration**.
   proxy and browser rendering.  Absolute MySQL latency is measured, but
   concurrent capacity is not claimed.
 * **AI provider:** the real OpenRouter MiniMax path is exercised in production
-  (interactions 24 and 27; 7.9 s and 7.0 s; status `ok`), the live provider test
-  listed 468 models and the MiniMax chat test returned in 993 ms.  The free
+  (interactions 24 and 27; 7.9 s and 7.0 s; status `ok`; plus the later real
+  user question 29 in 1560 ms), the live provider test listed 468 models and
+  the MiniMax chat test returned in 993 ms.  The free
   Nemotron model can still be rejected upstream with a capacity 502; auto/local
   fallback records the scrubbed error (interaction 17).  Concurrent load is
   **NOT TESTED**.
 * **AI browser flow:** local and production Playwright runs exercised the
   no-reload answer, history update/10-turn cap, localized network and HTTP
-  errors, Arabic RTL layout and 1440/834/390 widths.  The production run wrote
-  interactions 24-27 and provider/model audit events 177-178.
-* **Backups:** the pre- and post-deploy backups for `a971706` were checksum- and
-  gzip-verified (`pre-async-20261021`, `post-async-20261021`); they were not
-  restored into a disposable database in this code-only deployment.  Off-site
-  and point-in-time recovery remain **BLOCKED**.
+  errors, Arabic RTL layout and 1440/834/390 widths.  The tunnel run wrote
+  interactions 24-27 and provider/model audit events 177-178; the public HTTPS
+  run wrote interaction 28.  Interaction 29 (`"سلام"`, OpenRouter MiniMax,
+  1560 ms) was a later real user question, preserved across the reinstall.
+* **Backups:** the pre-, post- and final backups for `a971706` were checksum-
+  and gzip-verified (`pre-async-20261021`, `post-async-20261021`,
+  `final-async-20261021`, plus the 2026-10-22 `pre-funnel-reinstall-20261022`
+  and `post-funnel-reinstall-20261022`); none was restored into a disposable
+  database in this code-only deployment.  Off-site and point-in-time recovery
+  remain **BLOCKED**.
 * **Licensing:** transparent metadata only.  It cannot and does not disable the
   application.
-* **TLS:** the public URL is reachable with local `curl` and older Chromium 1179,
-  but not with branded Chrome or server-side `curl`.  No production proxy
-  configuration was changed while the cause is unknown.
+* **TLS:** after the 2026-10-22 funnel reinstall, the public URL answered
+  **6/6** `/healthz` and **3/3** `/login` requests with 200, and a public
+  Playwright login + `/ai` page passed in a secure context with 0 console
+  errors and 0 failed responses.  An earlier 5/12 burst failed at the TLS layer;
+  its root cause was not established, no long soak was run and branded Chrome
+  was not separately re-exercised.
 
 ---
 
@@ -150,7 +162,8 @@ Before calling `a971706` deployed:
 - [x] App recreated non-destructively (`docker compose up -d --no-deps app`);
       app and db containers healthy; `/healthz` 200.
 - [x] Database preserved: 57 tables, 184 FKs, products=2, users=2,
-      AI interactions append-only (27), revision `e5f6a7b8c9d0`.
+      AI interactions append-only (29, including the real user question 29
+      preserved across the reinstall), revision `e5f6a7b8c9d0`.
 - [x] Production acceptance: admin login, `/ai` async answer, local target,
       real OpenRouter MiniMax answer through the JSON path, tool trace,
       network/HTTP error handling in place, 10-turn cap, 1440/834/390 no
@@ -160,14 +173,25 @@ Before calling `a971706` deployed:
       interactions; SQL `bmshop-20261021-125307`) copied to
       `/home/sysuser/backups/` and verified: SHA-256 OK, gzip OK,
       `-- Dump completed` present.
+- [x] Final acceptance backup `final-async-20261021` (JSON 294 rows / 28 AI;
+      SQL `bmshop-20261021-130236`), then the 2026-10-22 funnel reinstall
+      backups `pre-funnel-reinstall-20261022` (JSON 307 rows / 29 AI; SQL
+      `bmshop-20261022-071633`) and `post-funnel-reinstall-20261022` (JSON
+      309 rows / 29 AI; SQL `bmshop-20261022-072012`) copied and verified:
+      SHA-256 OK, gzip OK, `-- Dump completed` present.
+- [x] `tsdproxy.funnel: "true"` present in the compose file and on the running
+      container; the app was force-recreated and tsdproxy re-registered the
+      proxy; public checks were 6/6 `/healthz`, 3/3 `/login` and a public
+      Chromium login + `/ai` page (section 9).
 - [x] Arabic/French/English parity and the no-JavaScript fallback are covered
       by tests.  **The new IAM pages are still not rendered in a browser —
       recorded as NOT TESTED.**
 - [x] Final statuses updated with `a971706` and the production evidence.
 
 Anything left unchecked above is **not** claimed as complete.  The outstanding
-release-level items are the public TLS path, off-site backup/PITR and
-concurrent-load capacity, recorded below.
+release-level items are a long TLS soak, off-site backup/PITR and
+concurrent-load capacity, recorded below.  The public path itself passes the
+current checks.
 
 ---
 
@@ -261,7 +285,7 @@ trail; the current deployment is recorded in sections 1 and 8.
 | Container | Recreated; `app` and `db` both **healthy** |
 | `flask doctor` | 11 PASS / 1 WARN (the pre-existing Arabic-PDF-font warning) |
 | Unauthenticated endpoints | `/healthz` 200, `/login` 200, `/` 302 to login |
-| Public HTTPS | `https://building-materials-shop-management-system.tail7d68dd.ts.net/healthz` and `/login` respond 200 when the Funnel path is reachable, with HSTS + CSP + nosniff + DENY + same-origin headers present; the path is intermittent (5 of 12 requests succeeded) — see the public TLS row above |
+| Public HTTPS | `https://building-materials-shop-management-system.tail7d68dd.ts.net/healthz` and `/login` respond 200 when the Funnel path is reachable, with HSTS + CSP + nosniff + DENY + same-origin headers present.  At the time of this IAM deployment the path was intermittent (5 of 12 requests succeeded); the current public path passes the checks in sections 1 and 9 |
 | Preserved data | products=2, users=2, audit events preserved (57 → 67, the growth is the verification logins) |
 | Post-deploy backup | `bmshop-20261021-072223` — verified in isolation: 55/55 tables, revision `c3d4e5f6a7b8`, 183 FKs, CHECK TABLE pass |
 
@@ -281,10 +305,10 @@ credentials and did **not** reset the password.
 | Item | Status |
 |---|---|
 | Playwright UI verification for the new IAM pages | **NOT TESTED** — the pages are verified server-side (HTTP 200, content and permissions) but not rendered in a browser |
-| External AI provider integration | **PASS** (later deployment `a971706`) — real OpenRouter MiniMax answers (interactions 24 and 27), provider `/models` test 468 models, MiniMax chat test 993 ms |
+| External AI provider integration | **PASS** (later deployment `a971706`) — real OpenRouter MiniMax answers (interactions 24, 27 and the real user question 29), provider `/models` test 468 models, MiniMax chat test 993 ms |
 | Concurrent-load capacity | **NOT TESTED** — the benchmark is single-process |
 | Off-site backup / PITR | **BLOCKED** — no destination or credentials |
-| Public TLS path from branded Chrome | **BLOCKED** — root cause still unknown; the SSH tunnel is used for browser acceptance |
+| Public TLS path from branded Chrome | **NOT TESTED** (branded Chrome) — the public path passes Chromium/Playwright and curl checks (sections 1 and 9); the earlier intermittency was not root-caused |
 
 ---
 
@@ -408,8 +432,8 @@ Two new tests fail the build if either pattern comes back.
 | New automated tests | 39 provider tests in `tests/test_ai_providers.py` and 25 AI workspace tests in `tests/test_ai.py` (including 4 async/JSON/template tests); **322 local tests pass** |
 | MySQL scratch migration | The whole provider chain applied to a disposable MySQL 8 database: 57 tables, 184 foreign keys, CHECK TABLE pass, insert/read works, the delete cascades, and the downgrade and re-upgrade both succeed.  The current `a971706` change adds no migration |
 | Authenticated acceptance on the deployed app | The historical provider-registry acceptance (all five pages 200, encrypted key, catalogue, delete) passed.  On the current deployment the live provider test listed **468 models** (audit event 177) and the MiniMax chat test returned in **993 ms** (audit event 178) |
-| Real browser (Playwright, deployed app) | The earlier provider-admin browser checks passed (catalogue, pre-filled form, encrypted key not in the page, delete buttons, zero overflow at 1440/834/390, 0 console errors/failed responses).  On `a971706` the browser exercised the async composer, a real OpenRouter answer, the tool trace, in-place errors and the provider/model test buttons, with screenshots at 1440/834/390 |
-| Backups | `a971706`: pre `pre-async-20261021` (JSON 268 rows / 20 AI; SQL `bmshop-20261021-124255`), post `post-async-20261021` (JSON 290 rows / 27 AI; SQL `bmshop-20261021-125307`); SHA-256 and gzip verified.  Earlier provider-admin backups `bmshop-20261021-095621` / `-100132` remain historical |
+| Real browser (Playwright, deployed app) | The earlier provider-admin browser checks passed (catalogue, pre-filled form, encrypted key not in the page, delete buttons, zero overflow at 1440/834/390, 0 console errors/failed responses).  On `a971706` the browser exercised the async composer, a real OpenRouter answer, the tool trace, in-place errors and the provider/model test buttons, with screenshots at 1440/834/390; the same flow passed over public HTTPS, and the public post-reinstall login + `/ai` page passed after the funnel re-registration |
+| Backups | `a971706`: pre `pre-async-20261021` (JSON 268 rows / 20 AI; SQL `bmshop-20261021-124255`), post `post-async-20261021` (JSON 290 rows / 27 AI; SQL `bmshop-20261021-125307`) and final `final-async-20261021` (JSON 294 rows / 28 AI; SQL `bmshop-20261021-130236`); reinstall pair `pre-funnel-reinstall-20261022` (307 rows / 29 AI; SQL `bmshop-20261022-071633`) and `post-funnel-reinstall-20261022` (309 rows / 29 AI; SQL `bmshop-20261022-072012`); SHA-256 and gzip verified.  Earlier provider-admin backups `bmshop-20261021-095621` / `-100132` remain historical |
 | Release identity | `flask version` reports `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; `flask db current` reports `e5f6a7b8c9d0`; `flask doctor` 11 PASS / 1 WARN |
 
 ### 7.6 An operational note about the one-off migration container
@@ -430,9 +454,9 @@ defect.
 
 | Item | Status |
 |---|---|
-| A real external provider call | **PASS** — OpenRouter MiniMax answered in production through the server-rendered form and the in-place fetch path (interactions 24 and 27; 7901 ms and 6968 ms; status `ok`); the MiniMax chat test returned in **993 ms** (audit 178) |
+| A real external provider call | **PASS** — OpenRouter MiniMax answered in production through the server-rendered form and the in-place fetch path (interactions 24 and 27; 7901 ms and 6968 ms; status `ok`) and a later real user question (interaction 29, 1560 ms); the MiniMax chat test returned in **993 ms** (audit 178) |
 | The `/models` listing against a real gateway | **PASS** — the provider test reached OpenRouter and listed **468 models** (audit 177) |
-| The in-place async workspace | **PASS** — local and production Playwright runs; see section 8 |
+| The in-place async workspace | **PASS** — local, SSH-tunnel and public-HTTPS Playwright runs; see section 8 |
 | Concurrent load with an external provider | **NOT TESTED** |
 | Nemotron free-model reliability | **PARTIAL** — the free Nemotron model can return an upstream 502/capacity error; auto/local fallback works and records the scrubbed error (interaction 17).  MiniMax is the working default |
 
@@ -481,10 +505,11 @@ top of the provider registry (`56bf190`, `670781b`) and the flexible workspace
 | AI tests | 25 in `tests/test_ai.py` (including 4 async/JSON/template tests) + 39 in `tests/test_ai_providers.py` |
 | Local browser | Playwright at 1440 and 390/834: login, template markers, pending state, first and second answers without reload, URL interaction, history update, 10-turn cap, clearing only on success, network abort and HTTP 400 shown in place, no horizontal overflow, and no console errors or failed responses during successful asks |
 | Production browser | Playwright through the SSH tunnel: admin login, 10 initial history turns, local target, two in-place answers, real OpenRouter answer via the JSON path, tool trace, network/HTTP errors in place, screenshots `prod-async-ai-1440.png`, `prod-async-ai-834.png`, `prod-async-ai-390.png`; no overflow and no console/failed responses during successful asks |
-| Production interactions | `22` local 5 ms low-stock and `23` local 21 ms overview (first run); `24` OpenRouter MiniMax 7901 ms "يوجد منتجان نشطان في الكتالوج." (first provider run; the answer was correct, the test assertion was too literal); `25` local 1 ms low-stock and `26` local 190 ms overview (rerun); `27` OpenRouter MiniMax **6968 ms** "يوجد منتجان نشطان." (final provider run); all `ok` |
+| Public HTTPS browser | Playwright at `https://building-materials-shop-management-system.tail7d68dd.ts.net`: login, secure context, in-place local answer (interaction 28), no reload, no overflow at 390, **0 console errors and 0 failed responses** during the successful ask; screenshots `prod-public-async-ai-1440.png` / `-390.png`.  After the 2026-10-22 funnel reinstall, a second public run logged in, opened `/ai`, confirmed the composer and inert templates and the hidden pending state, with 0 console/failed responses (section 9) |
+| Production interactions | `22` local 5 ms low-stock and `23` local 21 ms overview (first run); `24` OpenRouter MiniMax 7901 ms "يوجد منتجان نشطان في الكتالوج." (first provider run; the answer was correct, the test assertion was too literal); `25` local 1 ms low-stock and `26` local 190 ms overview (rerun); `27` OpenRouter MiniMax **6968 ms** "يوجد منتجان نشطان." (final provider run); `28` public local **2 ms** low-stock; `29` a later real user question "سلام" answered by OpenRouter MiniMax in **1560 ms**; all `ok` |
 | Provider/model tests | Provider 3 test: **468 models** (audit 177, 2026-10-21 12:51:09 UTC); MiniMax model 9: **993 ms** (audit 178, 12:51:12 UTC) |
-| Backups | `pre-async-20261021` JSON 268 rows / 20 AI, SQL `bmshop-20261021-124255`; `post-async-20261021` JSON 290 rows / 27 AI, SQL `bmshop-20261021-125307`; both SHA-256 and gzip verified, dump-complete marker present |
-| Release identity | `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; revision `e5f6a7b8c9d0`; 57 tables / 184 FKs; products=2, users=2 |
+| Backups | `pre-async-20261021` JSON 268 rows / 20 AI, SQL `bmshop-20261021-124255`; `post-async-20261021` JSON 290 rows / 27 AI, SQL `bmshop-20261021-125307`; `final-async-20261021` JSON 294 rows / 28 AI, SQL `bmshop-20261021-130236`; `pre-funnel-reinstall-20261022` JSON 307 rows / 29 AI, SQL `bmshop-20261022-071633`; `post-funnel-reinstall-20261022` JSON 309 rows / 29 AI, SQL `bmshop-20261022-072012`; all SHA-256 and gzip verified, dump-complete marker present |
+| Release identity | `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; revision `e5f6a7b8c9d0`; 57 tables / 184 FKs; products=2, users=2; labels re-verified after the 2026-10-22 force-recreate |
 
 The production browser run is the code deployed in `a971706`; its first
 provider assertion was too literal (`"2"` inside an Arabic sentence) and was
@@ -498,7 +523,29 @@ interaction table is append-only, so these verification rows are retained.
 |---|---|
 | Concurrent-load capacity with a real provider | **NOT TESTED** |
 | Nemotron free-model reliability | **PARTIAL** — upstream 502/capacity is possible; fallback records the error; MiniMax is the working default |
-| Public Funnel/TLS path | **BLOCKED** — intermittent; all browser acceptance used the SSH tunnel to `127.0.0.1:8090` |
+| Public Funnel/TLS path | **PASS (current verification)** — `tsdproxy.funnel: "true"` verified on the recreated container, proxy re-registered, 6/6 `/healthz` + 3/3 `/login` 200, and a public Chromium login + `/ai` page passed in a secure context with 0 console/failed responses (section 9) |
+| Public TLS long soak / branded Chrome | **NOT TESTED** — the earlier 5/12 failure was not root-caused; no 24-hour or multi-client soak was run and branded Chrome was not separately re-exercised |
 | Off-site backup / PITR | **BLOCKED** — no destination, credentials, binlog retention or restore drill |
 | Restore of the `a971706` backups in isolation | **NOT TESTED** — the backups were checksum/gzip-verified, but this code-only deploy did not repeat a full restore drill; the earlier restore drill remains the evidence for the mechanism |
 | Browser rendering of the new IAM pages | **NOT TESTED** (unchanged) |
+
+---
+
+## 9. Funnel label and force-reinstall verification (2026-10-22)
+
+The requested `tsdproxy.funnel: "true"` label was **already present** in both the
+repository `docker-compose.yml` and the labels of the running app container.
+No code change was required.  The requested reinstall was performed as a
+non-destructive force-recreate so tsdproxy would re-read the labels and
+re-register the service.
+
+| Check | Result |
+|---|---|
+| Container labels | `tsdproxy.enable=true`, `tsdproxy.name=Building-Materials-Shop-Management-System`, `tsdproxy.container_port=8000` and `tsdproxy.funnel=true` present in compose and on the recreated container |
+| Reinstall | `docker compose up -d --no-deps --force-recreate app`; the app reached **healthy** |
+| tsdproxy | Server logs at 07:17 show the previous proxy stopped, the target auto-detected on gateway port **8090**, the proxy set up again and the tsnet `AuthLoop` in state `Running`; public requests followed at 07:18 |
+| Release identity | `1.1.0 / a971706 / 2026-10-21T12:48:14Z`; database revision `e5f6a7b8c9d0` |
+| Public checks | **6/6** `/healthz` 200; **3/3** `/login` 200; public Chromium login + `/ai` page passed in a secure context with **0 console errors and 0 failed responses** (screenshot `public-funnel-ai.png`) |
+| Data | 57 tables / 184 FKs; products=2, users=2; **29** AI interactions; the real user question id 29 (`"سلام"`, OpenRouter MiniMax, 1560 ms) was preserved |
+| Backups | Pre `pre-funnel-reinstall-20261022` (JSON 307 rows / 29 AI; SQL `bmshop-20261022-071633`) and post `post-funnel-reinstall-20261022` (JSON 309 rows / 29 AI; SQL `bmshop-20261022-072012`); SHA-256, gzip and dump-complete marker verified |
+| Status | **PASS (current verification)**.  The earlier 5/12 TLS failure was not root-caused, no long soak was run, and branded Chrome was not separately re-exercised; this PASS covers the current public path, not a proof that the old TLS/ALPN fault cannot recur |
