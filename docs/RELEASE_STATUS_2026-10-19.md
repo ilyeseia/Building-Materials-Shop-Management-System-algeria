@@ -620,7 +620,7 @@ public target.
 | Funnel status | explicit `https://building...` -> `proxy http://127.0.0.1:8090` |
 | Application | `{"database":true,"status":"ok"}`; image `1.1.0 / a971706 / 2026-10-21T12:48:14Z` |
 | Data | 57 tables / 184 FKs; products=2, users=2, AI interactions=31; revision `e5f6a7b8c9d0` |
-| Backup | `bmshop-tailscale-state-20261022T092439Z-cold.tgz` (9.1K); app compose `app-compose-20261022T092056Z-dedicated.yml`; earlier DB/tsdproxy backups retained |
+| Backup | `bmshop-tailscale-state-20261022T092439Z-cold.tgz` (9.1K) and post-recovery live state `bmshop-tailscale-state-20261022T095703Z-live.tgz` (8.4K, tar-verified); post-recovery DB dump `bmshop-20261022-20261022T095703Z.sql.gz` (20K, 57 `CREATE TABLE`, gzip and dump-complete verified); app compose `app-compose-20261022T092056Z-dedicated.yml`; earlier DB/tsdproxy backups retained |
 | SSH exposure | Windows SSH Funnel reset; `tailscale funnel status` reports `No serve config` |
 
 ### Status and remaining limits
